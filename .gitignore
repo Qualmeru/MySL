@@ -1,0 +1,12 @@
+.gradle/
+.kotlin/
+build/
+local.properties
+.idea/
+*.iml
+
+# Build outputs and local files
+*.apk
+*.zip
+hs_err_pid*.log
+replay_pid*.log

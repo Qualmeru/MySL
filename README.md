@@ -19,19 +19,19 @@ It uses SL's open [Transport API](https://www.trafiklab.se/api/our-apis/sl/trans
 Open the project in Android Studio and press Run, or build from the command line with JDK 17 and the Android SDK (platform 35):
 
 ```bash
-./gradlew assemblePersonalDebug assembleFriendDebug
+./gradlew assembleStandardDebug assemblePresetDebug
 ```
 
 There are two flavours:
 
-| Flavour    | Starting favourites            | APK                                                     |
-|------------|--------------------------------|---------------------------------------------------------|
-| `personal` | Frihetsvägen, Helenelunds station | `app/build/outputs/apk/personal/debug/app-personal-debug.apk` |
-| `friend`   | None                           | `app/build/outputs/apk/friend/debug/app-friend-debug.apk`     |
+| Flavour    | Starting favourites               | APK                                                           |
+|------------|-----------------------------------|---------------------------------------------------------------|
+| `standard` | None, you add your own            | `app/build/outputs/apk/standard/debug/app-standard-debug.apk` |
+| `preset`   | Frihetsvägen, Helenelunds station | `app/build/outputs/apk/preset/debug/app-preset-debug.apk`     |
 
 The starting favourites only apply on a fresh install. After that, the app keeps whatever you've saved.
 
-On Windows, [`build.ps1`](build.ps1) builds both and copies them to `build\MySL.apk` and `build\MySL-friend.apk`. It expects JDK 17 and the SDK in `C:\tmp\android-tools`, and uses low-memory settings so it builds on a busy machine.
+On Windows, [`build.ps1`](build.ps1) builds both and copies them to `build\MySL.apk` (standard) and `build\MySL-preset.apk`. It expects JDK 17 and the SDK in `C:\tmp\android-tools`, and uses low-memory settings so it builds on a busy machine.
 
 ## Installing
 

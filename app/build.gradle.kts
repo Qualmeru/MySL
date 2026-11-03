@@ -28,16 +28,16 @@ android {
         buildConfig = true
     }
 
-    // personal starts with Frihetsvägen and Helenelund as favourites; friend starts empty.
+    // standard starts with no favourites; preset starts with Frihetsvägen and Helenelund.
     flavorDimensions += "favorites"
     productFlavors {
-        create("personal") {
-            dimension = "favorites"
-            buildConfigField("boolean", "STARTER_STOPS", "true")
-        }
-        create("friend") {
+        create("standard") {
             dimension = "favorites"
             buildConfigField("boolean", "STARTER_STOPS", "false")
+        }
+        create("preset") {
+            dimension = "favorites"
+            buildConfigField("boolean", "STARTER_STOPS", "true")
         }
     }
 }

@@ -31,14 +31,14 @@ There are two flavours:
 
 The starting favourites only apply on a fresh install. After that, the app keeps whatever you've saved.
 
-On Windows, [`build.ps1`](build.ps1) builds both and copies them to `MySL.apk` and `MySL-friend.apk`. It expects JDK 17 and the SDK in `C:\tmp\android-tools`, and uses low-memory settings so it builds on a busy machine.
+On Windows, [`build.ps1`](build.ps1) builds both and copies them to `build\MySL.apk` and `build\MySL-friend.apk`. It expects JDK 17 and the SDK in `C:\tmp\android-tools`, and uses low-memory settings so it builds on a busy machine.
 
 ## Installing
 
 Copy the APK to the phone and open it, allowing installs from that source when Android asks. Or, with USB debugging on:
 
 ```bash
-adb install -r MySL.apk
+adb install -r build/MySL.apk
 ```
 
 ## Code

@@ -1,4 +1,4 @@
-# Builds MySL.apk (your stops) and MySL-friend.apk (no favourites) using the tools in C:\tmp\android-tools.
+# Builds build\MySL.apk (your stops) and build\MySL-friend.apk (no favourites) using the tools in C:\tmp\android-tools.
 # TEMP is moved off the 8.3 short path (C:\Users\SIMONJ~1\...) because JDK 17
 # fails to open its internal sockets there ("Unable to establish loopback connection").
 # The low-memory JVM flags keep the build from crashing when RAM is tight.
@@ -13,6 +13,7 @@ Set-Location $PSScriptRoot
     "-Dorg.gradle.jvmargs=-Xmx900m -XX:MaxMetaspaceSize=320m -XX:ReservedCodeCacheSize=96m -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 -XX:+UseSerialGC -Dfile.encoding=UTF-8" `
     "-Pkotlin.compiler.execution.strategy=in-process"
 if ($LASTEXITCODE -ne 0) { throw "Gradle build failed" }
-Copy-Item app\build\outputs\apk\personal\debug\app-personal-debug.apk MySL.apk -Force
-Copy-Item app\build\outputs\apk\friend\debug\app-friend-debug.apk MySL-friend.apk -Force
-Write-Host "Built $PSScriptRoot\MySL.apk and $PSScriptRoot\MySL-friend.apk"
+New-Item -ItemType Directory -Force build | Out-Null
+Copy-Item app\build\outputs\apk\personal\debug\app-personal-debug.apk build\MySL.apk -Force
+Copy-Item app\build\outputs\apk\friend\debug\app-friend-debug.apk build\MySL-friend.apk -Force
+Write-Host "Built $PSScriptRoot\build\MySL.apk and $PSScriptRoot\build\MySL-friend.apk"

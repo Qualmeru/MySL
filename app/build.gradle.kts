@@ -1,12 +1,43 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// The release signing key lives outside git; keystore.properties (also not in git) points at it.
+// Every build signed with the same key can install over the previous one, whichever PC built it.
+val keystoreProps = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) file.inputStream().use { load(it) }
+}
+
 android {
     namespace = "se.mybus"
     compileSdk = 35
+
+    signingConfigs {
+        if (!keystoreProps.isEmpty) {
+            create("release") {
+                storeFile = file(keystoreProps.getProperty("storeFile"))
+                storePassword = keystoreProps.getProperty("storePassword")
+                keyAlias = keystoreProps.getProperty("keyAlias")
+                keyPassword = keystoreProps.getProperty("keyPassword")
+            }
+        }
+    }
+
+    buildTypes {
+        val releaseKey = signingConfigs.findByName("release")
+        if (releaseKey == null) {
+            logger.warn("keystore.properties not found: signing with this PC's debug key. " +
+                "Those APKs won't install over ones signed with the release key.")
+        }
+        // Debug builds use the release key too, so switching between debug and release keeps your data.
+        getByName("debug") { if (releaseKey != null) signingConfig = releaseKey }
+        getByName("release") { signingConfig = releaseKey ?: signingConfigs.getByName("debug") }
+    }
 
     defaultConfig {
         applicationId = "se.mybus"

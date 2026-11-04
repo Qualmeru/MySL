@@ -10,3 +10,8 @@ local.properties
 *.zip
 hs_err_pid*.log
 replay_pid*.log
+
+# Release signing key and its passwords (see README)
+keystore.properties
+*.jks
+*.keystore

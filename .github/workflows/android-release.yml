@@ -27,8 +27,12 @@ jobs:
           java-version: "17"
           cache: gradle
 
+      # List the packages explicitly: the default ("tools platform-tools") fails on newer
+      # command-line tools, which no longer have a "tools" package.
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          packages: "platform-tools platforms;android-35 build-tools;35.0.0"
 
       # Without the release key Gradle would sign with this runner's throwaway debug key,
       # and those APKs wouldn't install over existing copies. So no key, no build.

@@ -1,3 +1,4 @@
+# Builds signed release APKs and attaches them to the GitHub release. See README, "Automatic release builds".
 name: Android release builds
 
 on:

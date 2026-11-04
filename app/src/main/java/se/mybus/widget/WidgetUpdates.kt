@@ -1,6 +1,10 @@
 package se.mybus.widget
 
+import android.app.AlarmManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
 import android.content.Context
+import android.content.Intent
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
@@ -14,6 +18,9 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import se.mybus.Favorites
 import se.mybus.Settings
@@ -62,13 +69,63 @@ object WidgetCache {
 // Bumped after every cache write; the widget reads it so Glance redraws from the new cache.
 internal val CacheVersionKey = longPreferencesKey("cache_version")
 
+// After new data: redraw, and make sure the fetch job and minute redraws are running
+// (widgets placed before these existed never started them; both calls are no-ops after).
 suspend fun redrawWidgets(context: Context) {
+    if (redrawFromCache(context)) {
+        WidgetUpdates.schedule(context)
+        MinuteRedraw.start(context)
+    }
+}
+
+// Redraws every widget from the cache without fetching. Returns false if no widget is placed.
+suspend fun redrawFromCache(context: Context): Boolean {
     val ids = GlanceAppWidgetManager(context).getGlanceIds(DeparturesWidget::class.java)
-    // Widgets placed before this version never got the periodic job; KEEP makes this a no-op after.
-    if (ids.isNotEmpty()) WidgetUpdates.schedule(context)
     for (id in ids) {
         updateAppWidgetState(context, id) { it[CacheVersionKey] = System.currentTimeMillis() }
         DeparturesWidget().update(context, id)
+    }
+    return ids.isNotEmpty()
+}
+
+// Redraws the widget once a minute so departures drop off as they leave, without asking SL more
+// often. The alarm is non-waking (RTC): it only fires while the phone is awake, and one that came
+// due while the screen was off fires as soon as it turns on.
+object MinuteRedraw {
+    fun start(context: Context) {
+        alarms(context).setRepeating(
+            AlarmManager.RTC,
+            System.currentTimeMillis() + 60_000,
+            60_000,
+            pendingIntent(context),
+        )
+    }
+
+    fun stop(context: Context) {
+        alarms(context).cancel(pendingIntent(context))
+    }
+
+    private fun alarms(context: Context) = context.getSystemService(AlarmManager::class.java)
+
+    private fun pendingIntent(context: Context) = PendingIntent.getBroadcast(
+        context,
+        0,
+        Intent(context, MinuteRedrawReceiver::class.java),
+        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+}
+
+class MinuteRedrawReceiver : BroadcastReceiver() {
+    override fun onReceive(context: Context, intent: Intent) {
+        val pending = goAsync()
+        CoroutineScope(Dispatchers.Default).launch {
+            try {
+                // The last widget was removed without onDisabled reaching us: stop ticking.
+                if (!redrawFromCache(context)) MinuteRedraw.stop(context)
+            } finally {
+                pending.finish()
+            }
+        }
     }
 }
 

@@ -26,5 +26,9 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/departures_widget_info" />
         </receiver>
+
+        <receiver
+            android:name=".widget.MinuteRedrawReceiver"
+            android:exported="false" />
     </application>
 </manifest>

@@ -9,6 +9,7 @@ import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
 import androidx.glance.action.ActionParameters
+import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.action.ActionCallback
@@ -32,6 +33,7 @@ import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import se.mybus.Departure
 import se.mybus.Favorites
+import se.mybus.MainActivity
 import se.mybus.Settings
 import se.mybus.SlApi
 import se.mybus.Stop
@@ -66,12 +68,14 @@ private class StopView(val stop: Stop, val departures: List<Departure>?, val err
 class DeparturesWidget : GlanceAppWidget() {
 
     // Never fetches: WidgetUpdateWorker does that when the app has network, then bumps
-    // CacheVersionKey, which recomposes this from the cache.
+    // CacheVersionKey, which recomposes this from the cache. MinuteRedraw bumps it too, so
+    // departures that have left drop off within a minute.
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         // E.g. right after installing this version, or after adding a stop: nothing cached yet.
         if (Favorites.load(context).any { WidgetCache.load(context, it.siteId) == null }) {
             WidgetUpdates.schedule(context)
             WidgetUpdates.refreshNow(context)
+            MinuteRedraw.start(context)
         }
         provideContent {
             currentState(CacheVersionKey)
@@ -89,14 +93,18 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 }
 
+// Tapping anywhere but ↻ opens the app. Rows inside the LazyColumn need it set on each item,
+// because taps on list items don't reach the outer column.
+private fun openApp() = actionStartActivity<MainActivity>()
+
 @Composable
 private fun WidgetContent(s: Strings, views: List<StopView>, lastFetch: Long?) {
-    Column(modifier = GlanceModifier.fillMaxSize().background(WidgetBackground)) {
+    Column(modifier = GlanceModifier.fillMaxSize().background(WidgetBackground).clickable(openApp())) {
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
             verticalAlignment = Alignment.Vertical.CenterVertically,
         ) {
-            Column(modifier = GlanceModifier.defaultWeight()) {
+            Column(modifier = GlanceModifier.defaultWeight().clickable(openApp())) {
                 Text(s.title, style = TitleStyle)
                 if (lastFetch != null) {
                     val time = Instant.ofEpochMilli(lastFetch).atZone(ZoneId.systemDefault()).format(HourMinute)
@@ -125,7 +133,10 @@ private fun WidgetContent(s: Strings, views: List<StopView>, lastFetch: Long?) {
                     Text(
                         stop.name,
                         style = StopStyle,
-                        modifier = GlanceModifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 4.dp),
+                        modifier = GlanceModifier
+                            .fillMaxWidth()
+                            .clickable(openApp())
+                            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 4.dp),
                     )
                 }
                 val departures = view.departures
@@ -154,14 +165,18 @@ private fun WidgetContent(s: Strings, views: List<StopView>, lastFetch: Long?) {
 
 @Composable
 private fun Message(text: String) {
-    Text(text, style = MessageStyle, modifier = GlanceModifier.padding(horizontal = 14.dp, vertical = 4.dp))
+    Text(
+        text,
+        style = MessageStyle,
+        modifier = GlanceModifier.fillMaxWidth().clickable(openApp()).padding(horizontal = 14.dp, vertical = 4.dp),
+    )
 }
 
 @Composable
 private fun DepartureRowGlance(d: Departure) {
     Row(
         verticalAlignment = Alignment.Vertical.CenterVertically,
-        modifier = GlanceModifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 5.dp),
+        modifier = GlanceModifier.fillMaxWidth().clickable(openApp()).padding(horizontal = 14.dp, vertical = 5.dp),
     ) {
         // Fixed width so "41" and "178" line up (Glance has no min-width); fits up to "553H".
         Box(
@@ -176,8 +191,8 @@ private fun DepartureRowGlance(d: Departure) {
         Spacer(modifier = GlanceModifier.width(10.dp))
         Text(d.destination, style = DestinationStyle, maxLines = 1, modifier = GlanceModifier.defaultWeight())
         Spacer(modifier = GlanceModifier.width(10.dp))
-        // Clock time rather than "2 min": the widget only redraws every 15 minutes or so,
-        // and a clock time stays right in between.
+        // Clock time rather than "2 min": a countdown would only be as fresh as the last redraw,
+        // a clock time is right whenever you look.
         Text(d.expected, style = TimeStyle)
     }
 }

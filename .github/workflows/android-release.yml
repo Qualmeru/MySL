@@ -1,0 +1,95 @@
+name: Android release builds
+
+on:
+  push:
+    tags:
+      - "v*"
+      - "[0-9]*"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build release APKs
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      # Without the release key Gradle would sign with this runner's throwaway debug key,
+      # and those APKs wouldn't install over existing copies. So no key, no build.
+      - name: Set up release signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.MYSL_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.MYSL_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -z "$KEYSTORE_BASE64" ] || [ -z "$KEYSTORE_PASSWORD" ]; then
+            echo "::error::Add the MYSL_KEYSTORE_BASE64 and MYSL_KEYSTORE_PASSWORD repository secrets (see README, 'Signing')."
+            exit 1
+          fi
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/mysl-release.jks"
+          cat > keystore.properties <<EOF
+          storeFile=$RUNNER_TEMP/mysl-release.jks
+          storePassword=$KEYSTORE_PASSWORD
+          keyAlias=mysl
+          keyPassword=$KEYSTORE_PASSWORD
+          EOF
+
+      - name: Build release APKs
+        run: ./gradlew --no-daemon assembleStandardRelease assemblePresetRelease
+
+      - name: Prepare artifacts
+        run: |
+          mkdir -p dist
+          cp app/build/outputs/apk/standard/release/*.apk dist/MySL.apk
+          cp app/build/outputs/apk/preset/release/*.apk dist/MySL-preset.apk
+          cd dist
+          sha256sum *.apk > SHA256SUMS.txt
+
+      - name: Upload APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-release-apks
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download release files
+        uses: actions/download-artifact@v4
+        with:
+          name: android-release-apks
+          path: dist
+
+      # There's no checkout in this job, so tell gh which repository to use.
+      - name: Create or update GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
+            # Made in GitHub's web form: keep its title and notes, just attach the files.
+            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" dist/* --generate-notes --verify-tag
+          fi

@@ -48,6 +48,19 @@ keyPassword=...
 
 Use forward slashes in `storeFile`. With that file present, both debug and release builds are signed with the release key, so you can switch between them without losing data. Without it, Gradle warns and falls back to the PC's own debug key, and `build.ps1` refuses to build.
 
+### Automatic release builds
+
+[`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) builds both APKs on GitHub whenever a tag like `1.0.2` or `v1.0.2` is pushed, or a release is published with a new tag. It attaches `MySL.apk`, `MySL-preset.apk` and `SHA256SUMS.txt` to the release. If you wrote the release in GitHub's form, its title and notes are kept. It can also be run by hand from the Actions tab.
+
+It signs with the same release key, taken from two repository secrets (**Settings → Secrets and variables → Actions → New repository secret**):
+
+| Secret | Value |
+|--------|-------|
+| `MYSL_KEYSTORE_BASE64` | The `.jks` file as base64 |
+| `MYSL_KEYSTORE_PASSWORD` | `storePassword` from `keystore.properties` |
+
+Without them the workflow stops instead of publishing APKs that won't install over existing copies.
+
 **Back up `mysl-release.jks` and `keystore.properties` somewhere safe.** If they're lost, updates can no longer install over existing copies, and everyone has to uninstall (losing their favourites) to get a new version. To build releases on another PC, copy both files there.
 
 ## Installing

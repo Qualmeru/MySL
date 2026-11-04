@@ -30,6 +30,7 @@ import androidx.glance.layout.padding
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
+import androidx.glance.text.TextDecoration
 import androidx.glance.text.TextStyle
 import se.mybus.Departure
 import se.mybus.Favorites
@@ -51,6 +52,8 @@ private val WidgetBackground = ColorProvider(day = Color.White, night = Color(0x
 private val WidgetForeground = ColorProvider(day = Color(0xFF1C1B1F), night = Color.White)
 private val WidgetSecondary = ColorProvider(day = Color(0xFF49454F), night = Color(0xFFCAC4D0))
 private val WidgetOnBadge = ColorProvider(day = Color.White, night = Color.White)
+// Material's error colours, as the app uses for cancellations and disruptions.
+private val WidgetError = ColorProvider(day = Color(0xFFB3261E), night = Color(0xFFF2B8B5))
 
 private val TitleStyle = TextStyle(fontWeight = FontWeight.Bold, fontSize = 20.sp, color = WidgetForeground)
 private val UpdatedStyle = TextStyle(fontSize = 13.sp, color = WidgetSecondary)
@@ -59,6 +62,7 @@ private val MessageStyle = TextStyle(fontSize = 15.sp, color = WidgetSecondary)
 private val BadgeStyle = TextStyle(fontWeight = FontWeight.Bold, fontSize = 15.sp, color = WidgetOnBadge)
 private val DestinationStyle = TextStyle(fontSize = 17.sp, color = WidgetForeground)
 private val TimeStyle = TextStyle(fontWeight = FontWeight.Bold, fontSize = 17.sp, color = WidgetForeground)
+private val NoticeStyle = TextStyle(fontSize = 13.sp, color = WidgetError)
 
 private val HourMinute = DateTimeFormatter.ofPattern("HH:mm")
 
@@ -153,7 +157,7 @@ private fun WidgetContent(s: Strings, views: List<StopView>, lastFetch: Long?) {
                             upcoming.isEmpty() -> item(itemId = nid()) { Message(s.noDepartures) }
                             shown.isEmpty() -> item(itemId = nid()) { Message(s.noDeparturesSelectedDirections) }
                             else -> for (d in shown) {
-                                item(itemId = nid()) { DepartureRowGlance(d) }
+                                item(itemId = nid()) { DepartureRowGlance(s, d) }
                             }
                         }
                     }
@@ -173,7 +177,7 @@ private fun Message(text: String) {
 }
 
 @Composable
-private fun DepartureRowGlance(d: Departure) {
+private fun DepartureRowGlance(s: Strings, d: Departure) {
     Row(
         verticalAlignment = Alignment.Vertical.CenterVertically,
         modifier = GlanceModifier.fillMaxWidth().clickable(openApp()).padding(horizontal = 14.dp, vertical = 5.dp),
@@ -189,11 +193,27 @@ private fun DepartureRowGlance(d: Departure) {
             Text(d.line, style = BadgeStyle)
         }
         Spacer(modifier = GlanceModifier.width(10.dp))
-        Text(d.destination, style = DestinationStyle, maxLines = 1, modifier = GlanceModifier.defaultWeight())
+        // Same as the app: a cancelled departure is crossed out and says so, and SL's disruption
+        // notice (delays, track faults...) goes in red under the destination.
+        val strike = if (d.cancelled) TextDecoration.LineThrough else null
+        val notice = listOfNotNull(s.cancelled.takeIf { d.cancelled }, d.deviation).joinToString(" · ")
+        Column(modifier = GlanceModifier.defaultWeight()) {
+            Text(
+                d.destination,
+                style = DestinationStyle.copy(textDecoration = strike),
+                maxLines = 1,
+            )
+            if (notice.isNotEmpty()) {
+                Text(notice, style = NoticeStyle, maxLines = 2)
+            }
+        }
         Spacer(modifier = GlanceModifier.width(10.dp))
         // Clock time rather than "2 min": a countdown would only be as fresh as the last redraw,
         // a clock time is right whenever you look.
-        Text(d.expected, style = TimeStyle)
+        Text(
+            d.expected,
+            style = if (d.cancelled) TimeStyle.copy(color = WidgetError, textDecoration = strike) else TimeStyle,
+        )
     }
 }
 

@@ -50,6 +50,7 @@ abstract class Strings {
     abstract val noMatches: String
     abstract val added: String
     abstract val noInternet: String
+    abstract val connectionFailed: String
 
     // SL sends "Nu" for departures leaving now; "3 min" and "21:22" read the same in both languages.
     fun display(slDisplay: String) = if (slDisplay == "Nu") now else slDisplay
@@ -111,6 +112,7 @@ object Swedish : Strings() {
     override val noMatches = "Inga träffar"
     override val added = "Tillagd"
     override val noInternet = "Ingen internetanslutning"
+    override val connectionFailed = "Kunde inte nå SL, försök igen"
 }
 
 object English : Strings() {
@@ -169,6 +171,7 @@ object English : Strings() {
     override val noMatches = "No matches"
     override val added = "Added"
     override val noInternet = "No internet connection"
+    override val connectionFailed = "Couldn't reach SL, try again"
 }
 
 fun stringsFor(language: Language): Strings = when (language) {
@@ -181,14 +184,15 @@ val LocalStrings = staticCompositionLocalOf<Strings> { Swedish }
 
 // Turn a connectivity exception into a message a rider understands, instead of the raw
 // "Unable to resolve host" / "failed to connect" text from the underlying HTTP client.
+// Only UnknownHostException (DNS can't even look up the address) means the device truly has
+// no network path; a timeout or refused connection can happen for other reasons — e.g. a
+// background widget update running under a restricted network window — even while the phone
+// is otherwise online, so those get a distinct, less definitive message.
 fun friendlyError(e: Exception, s: Strings): String {
     var cause: Throwable? = e
     while (cause != null) {
-        if (cause is UnknownHostException || cause is java.net.ConnectException ||
-            cause is java.net.SocketTimeoutException
-        ) {
-            return s.noInternet
-        }
+        if (cause is UnknownHostException) return s.noInternet
+        if (cause is java.net.ConnectException || cause is java.net.SocketTimeoutException) return s.connectionFailed
         cause = cause.cause
     }
     return e.message ?: e.javaClass.simpleName

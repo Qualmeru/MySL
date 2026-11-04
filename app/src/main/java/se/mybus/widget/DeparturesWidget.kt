@@ -32,6 +32,7 @@ import androidx.glance.text.TextStyle
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.delay
 import se.mybus.Departure
 import se.mybus.Favorites
 import se.mybus.Settings
@@ -54,21 +55,27 @@ private sealed interface StopResult {
     data class Failed(val message: String) : StopResult
 }
 
+// A background refresh can land in a brief window with no network yet (e.g. right as Doze's
+// maintenance window opens), even though the phone is online a moment later, so retry once
+// before reporting failure.
+private suspend fun fetchWithRetry(stop: Stop, s: Strings): StopResult = try {
+    StopResult.Loaded(SlApi.departures(stop))
+} catch (e: Exception) {
+    delay(3_000)
+    try {
+        StopResult.Loaded(SlApi.departures(stop))
+    } catch (e2: Exception) {
+        StopResult.Failed(friendlyError(e2, s))
+    }
+}
+
 class DeparturesWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val s = stringsFor(Settings.loadLanguage(context))
         val stops = Favorites.load(context)
         val results: List<Pair<Stop, StopResult>> = coroutineScope {
-            stops.map { stop ->
-                async {
-                    stop to try {
-                        StopResult.Loaded(SlApi.departures(stop))
-                    } catch (e: Exception) {
-                        StopResult.Failed(friendlyError(e, s))
-                    }
-                }
-            }.awaitAll()
+            stops.map { stop -> async { stop to fetchWithRetry(stop, s) } }.awaitAll()
         }
 
         provideContent {

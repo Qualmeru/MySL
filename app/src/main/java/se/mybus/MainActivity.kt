@@ -39,6 +39,9 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import se.mybus.widget.WidgetCache
+import se.mybus.widget.WidgetUpdates
+import se.mybus.widget.redrawWidgets
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -111,6 +114,8 @@ fun App(settingsMenu: @Composable () -> Unit) {
     fun setFavorites(stops: List<Stop>) {
         favorites = stops
         Favorites.save(context, stops)
+        // The home-screen widget shows the same stops and filters.
+        WidgetUpdates.refreshNow(context)
     }
 
     if (searching) {
@@ -146,6 +151,7 @@ fun DeparturesScreen(
     onSetHidden: (Stop, Set<Int>, Set<String>) -> Unit,
 ) {
     val s = LocalStrings.current
+    val context = LocalContext.current
     var updatedAt by remember { mutableStateOf<String?>(null) }
     var refreshing by remember { mutableStateOf(false) }
     var confirmRemove by remember { mutableStateOf<Stop?>(null) }
@@ -161,8 +167,11 @@ fun DeparturesScreen(
         // One stop at a time: SL rejects simultaneous requests with HTTP 429.
         for (stop in currentFavorites) {
             states[stop.siteId] = try {
+                val body = SlApi.departuresJson(stop)
+                // Opening the app also freshens the widget, which can't always fetch on its own.
+                WidgetCache.saveBody(context, stop.siteId, body)
                 // Keep every departure; the direction filter needs all stop points to offer them.
-                StopState.Loaded(SlApi.departures(stop))
+                StopState.Loaded(SlApi.parseDepartures(body))
             } catch (e: Exception) {
                 val message = friendlyError(e, s)
                 when (val previous = states[stop.siteId]) {
@@ -173,6 +182,7 @@ fun DeparturesScreen(
         }
         updatedAt = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
         refreshing = false
+        redrawWidgets(context)
     }
 
     // Poll every minute, but only while the app is on screen.

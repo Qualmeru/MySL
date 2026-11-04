@@ -8,6 +8,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 import java.time.LocalDate
+import java.time.LocalDateTime
 
 // hiddenStopPoints: stop points (one per street side / platform, i.e. direction) the user filtered out.
 // hiddenLines: line designations (e.g. "179") the user filtered out at this stop.
@@ -32,6 +33,8 @@ data class Departure(
     val destination: String,
     val display: String,
     val expected: String,
+    // Full local time, so cached departures that have already left can be dropped.
+    val expectedAt: LocalDateTime?,
     val platform: String,
     val stopPointId: Int,
     val cancelled: Boolean,
@@ -50,14 +53,17 @@ object SlApi {
 
     // All modes (bus, train, metro, tram, boat). The API now and then answers 200 with an
     // empty list while traffic is running, so only believe "nothing" after hearing it a few times.
-    suspend fun departures(stop: Stop): List<Departure> {
+    suspend fun departures(stop: Stop): List<Departure> = parseDepartures(departuresJson(stop))
+
+    // The raw answer, for callers that cache it (the widget) and parse it later.
+    suspend fun departuresJson(stop: Stop): String {
         val url = URL("$BASE/sites/${stop.siteId}/departures?forecast=60")
         repeat(EMPTY_ATTEMPTS - 1) {
-            val departures = parseDepartures(fetch(url))
-            if (departures.isNotEmpty()) return departures
+            val body = fetch(url)
+            if (parseDepartures(body).isNotEmpty()) return body
             delay(1_000)
         }
-        return parseDepartures(fetch(url))
+        return fetch(url)
     }
 
     suspend fun allSites(): List<Site> {
@@ -103,12 +109,13 @@ object SlApi {
         }
     }
 
-    private fun parseDepartures(body: String): List<Departure> {
+    fun parseDepartures(body: String): List<Departure> {
         val arr = JSONObject(body).optJSONArray("departures") ?: return emptyList()
         return (0 until arr.length()).map { i ->
             val d = arr.getJSONObject(i)
             val deviations = d.optJSONArray("deviations")
             val line = d.getJSONObject("line")
+            val time = d.optString("expected", d.optString("scheduled"))
             Departure(
                 line = line.optString("designation"),
                 mode = when (line.optString("transport_mode")) {
@@ -123,7 +130,8 @@ object SlApi {
                 destination = d.optString("destination"),
                 display = d.optString("display"),
                 // "2026-11-03T20:51:03" -> "20:51"
-                expected = d.optString("expected", d.optString("scheduled")).substringAfter('T').take(5),
+                expected = time.substringAfter('T').take(5),
+                expectedAt = runCatching { LocalDateTime.parse(time) }.getOrNull(),
                 platform = d.optJSONObject("stop_point")?.optString("designation").orEmpty(),
                 stopPointId = d.optJSONObject("stop_point")?.optInt("id") ?: 0,
                 cancelled = d.optString("state") == "CANCELLED",

@@ -25,10 +25,12 @@ object Favorites {
         return (0 until arr.length()).map { i ->
             val o = arr.getJSONObject(i)
             val hidden = o.optJSONArray("hidden")
+            val hiddenLines = o.optJSONArray("hiddenLines")
             Stop(
                 o.getInt("id"),
                 o.getString("name"),
                 if (hidden == null) emptySet() else (0 until hidden.length()).map { hidden.getInt(it) }.toSet(),
+                if (hiddenLines == null) emptySet() else (0 until hiddenLines.length()).map { hiddenLines.getString(it) }.toSet(),
             )
         }
     }
@@ -41,6 +43,7 @@ object Favorites {
                     .put("id", it.siteId)
                     .put("name", it.name)
                     .put("hidden", JSONArray(it.hiddenStopPoints.toList()))
+                    .put("hiddenLines", JSONArray(it.hiddenLines.toList()))
             )
         }
         prefs(context).edit().putString(KEY, arr.toString()).apply()

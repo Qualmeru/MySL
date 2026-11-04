@@ -1,6 +1,7 @@
 package se.mybus
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import java.net.UnknownHostException
 import java.util.Locale
 
 // Every text the app shows, in Swedish and English. Stop and destination names come from SL as-is.
@@ -33,6 +34,7 @@ abstract class Strings {
     abstract val noDirectionsNow: String
     abstract val singleDirection: String
     abstract val showDeparturesGoing: String
+    abstract val showLinesGoing: String
     abstract fun towards(destinations: String): String
     abstract fun platform(p: String, mode: Mode): String
     abstract fun modeName(mode: Mode): String
@@ -47,6 +49,7 @@ abstract class Strings {
     abstract val typeStopName: String
     abstract val noMatches: String
     abstract val added: String
+    abstract val noInternet: String
 
     // SL sends "Nu" for departures leaving now; "3 min" and "21:22" read the same in both languages.
     fun display(slDisplay: String) = if (slDisplay == "Nu") now else slDisplay
@@ -63,7 +66,7 @@ object Swedish : Strings() {
     override fun couldNotFetch(error: String) = "Kunde inte hämta: $error"
     override fun couldNotRefresh(error: String) = "Kunde inte uppdatera ($error), visar äldre tider"
     override val noDepartures = "Inga avgångar inom en timme"
-    override val noDeparturesSelectedDirections = "Inga avgångar åt valda riktningar inom en timme"
+    override val noDeparturesSelectedDirections = "Inga avgångar som matchar dina filter inom en timme"
     override fun removeTitle(stop: String) = "Ta bort $stop?"
     override val removeText = "Hållplatsen tas bort från dina favoriter."
     override val remove = "Ta bort"
@@ -85,6 +88,7 @@ object Swedish : Strings() {
     override val noDirectionsNow = "Inga avgångar just nu att välja riktning från. Försök igen när trafiken går."
     override val singleDirection = "Allt här avgår från samma läge, så det finns inget att filtrera."
     override val showDeparturesGoing = "Visa avgångar:"
+    override val showLinesGoing = "Visa linjer:"
     override fun towards(destinations: String) = "mot $destinations"
     override fun platform(p: String, mode: Mode) = if (mode == Mode.BUS) "Läge $p" else "Spår $p"
     override fun modeName(mode: Mode) = when (mode) {
@@ -106,6 +110,7 @@ object Swedish : Strings() {
     override val typeStopName = "Skriv namnet på en hållplats"
     override val noMatches = "Inga träffar"
     override val added = "Tillagd"
+    override val noInternet = "Ingen internetanslutning"
 }
 
 object English : Strings() {
@@ -119,7 +124,7 @@ object English : Strings() {
     override fun couldNotFetch(error: String) = "Couldn't load: $error"
     override fun couldNotRefresh(error: String) = "Couldn't refresh ($error), showing older times"
     override val noDepartures = "No departures within an hour"
-    override val noDeparturesSelectedDirections = "No departures in the chosen directions within an hour"
+    override val noDeparturesSelectedDirections = "No departures matching your filters within an hour"
     override fun removeTitle(stop: String) = "Remove $stop?"
     override val removeText = "The stop will be removed from your favourites."
     override val remove = "Remove"
@@ -141,6 +146,7 @@ object English : Strings() {
     override val noDirectionsNow = "No departures right now to pick a direction from. Try again when traffic is running."
     override val singleDirection = "Everything here leaves from the same spot, so there's nothing to filter."
     override val showDeparturesGoing = "Show departures:"
+    override val showLinesGoing = "Show lines:"
     override fun towards(destinations: String) = "towards $destinations"
     override fun platform(p: String, mode: Mode) = if (mode == Mode.BUS) "Stand $p" else "Track $p"
     override fun modeName(mode: Mode) = when (mode) {
@@ -162,6 +168,7 @@ object English : Strings() {
     override val typeStopName = "Type the name of a stop"
     override val noMatches = "No matches"
     override val added = "Added"
+    override val noInternet = "No internet connection"
 }
 
 fun stringsFor(language: Language): Strings = when (language) {
@@ -171,3 +178,18 @@ fun stringsFor(language: Language): Strings = when (language) {
 }
 
 val LocalStrings = staticCompositionLocalOf<Strings> { Swedish }
+
+// Turn a connectivity exception into a message a rider understands, instead of the raw
+// "Unable to resolve host" / "failed to connect" text from the underlying HTTP client.
+fun friendlyError(e: Exception, s: Strings): String {
+    var cause: Throwable? = e
+    while (cause != null) {
+        if (cause is UnknownHostException || cause is java.net.ConnectException ||
+            cause is java.net.SocketTimeoutException
+        ) {
+            return s.noInternet
+        }
+        cause = cause.cause
+    }
+    return e.message ?: e.javaClass.simpleName
+}

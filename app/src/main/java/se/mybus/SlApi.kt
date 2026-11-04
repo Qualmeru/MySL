@@ -10,7 +10,13 @@ import java.net.URL
 import java.time.LocalDate
 
 // hiddenStopPoints: stop points (one per street side / platform, i.e. direction) the user filtered out.
-data class Stop(val siteId: Int, val name: String, val hiddenStopPoints: Set<Int> = emptySet())
+// hiddenLines: line designations (e.g. "179") the user filtered out at this stop.
+data class Stop(
+    val siteId: Int,
+    val name: String,
+    val hiddenStopPoints: Set<Int> = emptySet(),
+    val hiddenLines: Set<String> = emptySet(),
+)
 
 // A stop from SL's full site list; note is the area or street that tells same-named stops apart.
 data class Site(val id: Int, val name: String, val note: String)

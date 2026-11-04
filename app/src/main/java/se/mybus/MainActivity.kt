@@ -12,7 +12,9 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
@@ -124,8 +126,10 @@ fun App(settingsMenu: @Composable () -> Unit) {
             settingsMenu = settingsMenu,
             onAdd = { searching = true },
             onRemove = { stop -> setFavorites(favorites.filter { it.siteId != stop.siteId }) },
-            onSetHidden = { stop, hidden ->
-                setFavorites(favorites.map { if (it.siteId == stop.siteId) it.copy(hiddenStopPoints = hidden) else it })
+            onSetHidden = { stop, hidden, hiddenLines ->
+                setFavorites(favorites.map {
+                    if (it.siteId == stop.siteId) it.copy(hiddenStopPoints = hidden, hiddenLines = hiddenLines) else it
+                })
             },
         )
     }
@@ -139,7 +143,7 @@ fun DeparturesScreen(
     settingsMenu: @Composable () -> Unit,
     onAdd: () -> Unit,
     onRemove: (Stop) -> Unit,
-    onSetHidden: (Stop, Set<Int>) -> Unit,
+    onSetHidden: (Stop, Set<Int>, Set<String>) -> Unit,
 ) {
     val s = LocalStrings.current
     var updatedAt by remember { mutableStateOf<String?>(null) }
@@ -160,7 +164,7 @@ fun DeparturesScreen(
                 // Keep every departure; the direction filter needs all stop points to offer them.
                 StopState.Loaded(SlApi.departures(stop))
             } catch (e: Exception) {
-                val message = e.message ?: e.javaClass.simpleName
+                val message = friendlyError(e, s)
                 when (val previous = states[stop.siteId]) {
                     is StopState.Loaded -> previous.copy(refreshError = message)
                     else -> StopState.Failed(message)
@@ -231,7 +235,7 @@ fun DeparturesScreen(
                         is StopState.Loaded -> {
                             state.refreshError?.let { item { Message(s.couldNotRefresh(it)) } }
                             val shown = state.departures
-                                .filter { it.stopPointId !in stop.hiddenStopPoints }
+                                .filter { it.stopPointId !in stop.hiddenStopPoints && it.line !in stop.hiddenLines }
                                 .take(MAX_PER_STOP)
                             when {
                                 state.departures.isEmpty() -> item { Message(s.noDepartures) }
@@ -263,7 +267,7 @@ fun DeparturesScreen(
         DirectionFilterDialog(
             stop = stop,
             departures = (states[stop.siteId] as? StopState.Loaded)?.departures.orEmpty(),
-            onSave = { hidden -> onSetHidden(stop, hidden); filtering = null },
+            onSave = { hidden, hiddenLines -> onSetHidden(stop, hidden, hiddenLines); filtering = null },
             onDismiss = { filtering = null },
         )
     }
@@ -408,28 +412,38 @@ private fun directionsOf(departures: List<Departure>): List<Direction> =
         )
     }.sortedWith(compareBy({ it.mode }, { it.platform }, { it.destinations.firstOrNull() }))
 
+private data class LineEntry(val line: String, val mode: Mode)
+
+private fun linesOf(departures: List<Departure>): List<LineEntry> =
+    departures.map { LineEntry(it.line, it.mode) }.distinct()
+        .sortedWith(compareBy({ it.mode }, { it.line.toIntOrNull() ?: Int.MAX_VALUE }, { it.line }))
+
 @Composable
 private fun DirectionFilterDialog(
     stop: Stop,
     departures: List<Departure>,
-    onSave: (Set<Int>) -> Unit,
+    onSave: (Set<Int>, Set<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
     val directions = remember(departures) { directionsOf(departures) }
+    val lines = remember(departures) { linesOf(departures) }
     // Only name the mode when the stop has more than one, e.g. buses and trains at a station.
     val mixedModes = directions.map { it.mode }.distinct().size > 1
     var hidden by remember { mutableStateOf(stop.hiddenStopPoints) }
+    var hiddenLines by remember { mutableStateOf(stop.hiddenLines) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(s.directionsTitle(stop.name)) },
         text = {
-            Column {
-                when {
-                    directions.isEmpty() -> Text(s.noDirectionsNow)
-                    directions.size == 1 -> Text(s.singleDirection)
-                    else -> {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                if (directions.isEmpty()) {
+                    Text(s.noDirectionsNow)
+                } else {
+                    if (directions.size == 1) {
+                        Text(s.singleDirection)
+                    } else {
                         Text(s.showDeparturesGoing, style = MaterialTheme.typography.bodyMedium)
                         Spacer(Modifier.height(8.dp))
                         for (d in directions) {
@@ -459,16 +473,45 @@ private fun DirectionFilterDialog(
                             }
                         }
                     }
+                    if (lines.size > 1) {
+                        Spacer(Modifier.height(16.dp))
+                        Text(s.showLinesGoing, style = MaterialTheme.typography.bodyMedium)
+                        Spacer(Modifier.height(8.dp))
+                        for (l in lines) {
+                            val shown = l.line !in hiddenLines
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        hiddenLines = if (shown) hiddenLines + l.line else hiddenLines - l.line
+                                    },
+                            ) {
+                                Checkbox(checked = shown, onCheckedChange = null)
+                                Spacer(Modifier.width(8.dp))
+                                Column(Modifier.padding(vertical = 8.dp)) {
+                                    Text(l.line, fontWeight = FontWeight.Bold)
+                                    if (mixedModes) {
+                                        Text(
+                                            s.modeName(l.mode),
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(hidden) }) { Text(s.save) }
+            TextButton(onClick = { onSave(hidden, hiddenLines) }) { Text(s.save) }
         },
         dismissButton = {
             Row {
-                if (hidden.isNotEmpty()) {
-                    TextButton(onClick = { onSave(emptySet()) }) { Text(s.showAll) }
+                if (hidden.isNotEmpty() || hiddenLines.isNotEmpty()) {
+                    TextButton(onClick = { onSave(emptySet(), emptySet()) }) { Text(s.showAll) }
                 }
                 TextButton(onClick = onDismiss) { Text(s.cancel) }
             }
@@ -484,20 +527,6 @@ fun Message(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
     )
-}
-
-// Roughly SL's own line colours, so badges look like the signs at the stop.
-private fun lineColor(d: Departure): Color = when (d.mode) {
-    Mode.BUS -> if (d.lineGroup == "Blåbuss") Color(0xFF0089CA) else Color(0xFFD71D24)
-    Mode.TRAIN -> Color(0xFFEC619F)
-    Mode.METRO -> when {
-        "gröna" in d.lineGroup -> Color(0xFF179D4D)
-        "röda" in d.lineGroup -> Color(0xFFE3242B)
-        else -> Color(0xFF0089CA) // blå linje
-    }
-    Mode.TRAM -> Color(0xFFD77D00)
-    Mode.SHIP -> Color(0xFF00A3A8)
-    Mode.OTHER -> Color(0xFF6E6E6E)
 }
 
 @Composable

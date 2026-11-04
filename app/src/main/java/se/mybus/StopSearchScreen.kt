@@ -32,7 +32,7 @@ fun StopSearchScreen(favoriteIds: Set<Int>, onPick: (Stop) -> Unit, onBack: () -
         try {
             sites = SlApi.allSites()
         } catch (e: Exception) {
-            error = e.message ?: e.javaClass.simpleName
+            error = friendlyError(e, s)
         }
     }
     val matches = remember(query, sites) { search(sites.orEmpty(), query) }

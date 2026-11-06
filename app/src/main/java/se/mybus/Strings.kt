@@ -52,6 +52,10 @@ abstract class Strings {
     abstract val noInternet: String
     abstract val connectionFailed: String
     abstract val slBusy: String
+    abstract fun updateAvailable(version: String): String
+    abstract val updateHint: String
+    abstract val download: String
+    abstract val notNow: String
     abstract val moveUp: String
     abstract val moveDown: String
     abstract fun linesHidden(n: Int): String
@@ -138,6 +142,10 @@ object Swedish : Strings() {
     override val noInternet = "Ingen internetanslutning"
     override val connectionFailed = "Kunde inte nå SL, försök igen"
     override val slBusy = "SL har för många förfrågningar just nu, försök igen om en stund"
+    override fun updateAvailable(version: String) = "MySL $version finns"
+    override val updateHint = "Ladda ned den nya APK-filen från GitHub och öppna den. Dina favoriter finns kvar."
+    override val download = "Ladda ned"
+    override val notNow = "Inte nu"
     override val moveUp = "Flytta upp"
     override val moveDown = "Flytta ner"
     override fun linesHidden(n: Int) = if (n == 1) "1 linje dold" else "$n linjer dolda"
@@ -222,6 +230,10 @@ object English : Strings() {
     override val noInternet = "No internet connection"
     override val connectionFailed = "Couldn't reach SL, try again"
     override val slBusy = "SL is getting too many requests right now, try again in a while"
+    override fun updateAvailable(version: String) = "MySL $version is available"
+    override val updateHint = "Download the new APK from GitHub and open it. Your favourites are kept."
+    override val download = "Download"
+    override val notNow = "Not now"
     override val moveUp = "Move up"
     override val moveDown = "Move down"
     override fun linesHidden(n: Int) = if (n == 1) "1 line hidden" else "$n lines hidden"

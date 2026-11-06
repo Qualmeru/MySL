@@ -2,6 +2,7 @@ package se.mybus
 
 import android.Manifest
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -138,6 +139,9 @@ fun App(settingsMenu: @Composable (List<Stop>, (List<Stop>) -> Unit) -> Unit) {
     var searching by rememberSaveable { mutableStateOf(false) }
     // Kept here so departures survive a trip to the search screen.
     val states = remember { mutableStateMapOf<Int, StopState>() }
+    // A newer release on GitHub, looked for at most once a day.
+    var update by remember { mutableStateOf<AvailableUpdate?>(null) }
+    LaunchedEffect(Unit) { update = UpdateCheck.available(context) }
 
     fun setFavorites(stops: List<Stop>) {
         favorites = stops
@@ -156,6 +160,8 @@ fun App(settingsMenu: @Composable (List<Stop>, (List<Stop>) -> Unit) -> Unit) {
         DeparturesScreen(
             favorites = favorites,
             states = states,
+            update = update,
+            onDismissUpdate = { update?.let { UpdateCheck.dismiss(context, it) }; update = null },
             settingsMenu = { settingsMenu(favorites) { imported -> setFavorites(favorites.mergedWith(imported)) } },
             onAdd = { searching = true },
             onRemove = { stop -> setFavorites(favorites.filter { it.siteId != stop.siteId }) },
@@ -174,6 +180,8 @@ fun App(settingsMenu: @Composable (List<Stop>, (List<Stop>) -> Unit) -> Unit) {
 fun DeparturesScreen(
     favorites: List<Stop>,
     states: SnapshotStateMap<Int, StopState>,
+    update: AvailableUpdate?,
+    onDismissUpdate: () -> Unit,
     settingsMenu: @Composable () -> Unit,
     onAdd: () -> Unit,
     onRemove: (Stop) -> Unit,
@@ -258,6 +266,7 @@ fun DeparturesScreen(
             modifier = Modifier.padding(padding).fillMaxSize(),
         ) {
             LazyColumn(modifier = Modifier.fillMaxSize()) {
+                update?.let { item(key = "update") { UpdateBanner(it, onDismissUpdate) } }
                 if (favorites.isEmpty()) {
                     item { Message(s.noFavorites) }
                 }
@@ -640,6 +649,28 @@ private fun DirectionFilterDialog(
             }
         },
     )
+}
+
+// "MySL 1.3.0 is available": Download opens the release page, Not now hides it for that version.
+@Composable
+private fun UpdateBanner(update: AvailableUpdate, onDismiss: () -> Unit) {
+    val s = LocalStrings.current
+    val context = LocalContext.current
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Column(Modifier.padding(start = 16.dp, end = 8.dp, top = 12.dp, bottom = 4.dp)) {
+            Text(s.updateAvailable(update.version), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(s.updateHint, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.padding(top = 4.dp, end = 8.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                TextButton(onClick = onDismiss) { Text(s.notNow) }
+                TextButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(update.url))) }) {
+                    Text(s.download)
+                }
+            }
+        }
+    }
 }
 
 @Composable

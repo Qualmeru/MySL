@@ -13,6 +13,8 @@ It uses SL's open [Transport API](https://www.trafiklab.se/api/our-apis/sl/trans
 - **Home-screen widgets:** *All favourite stops* scrolls through every favourite; *One stop* shows a single stop you pick and fits a 2×2 spot. Both follow the stops' filters, refresh every 15 minutes (or on ↻), and drop departures as they leave.
 - **Disruption alerts:** optional (⋮ menu → Disruption alerts). A notification when one of your stops gets a new disruption or a cancelled departure on a line you haven't hidden. Checked every 15 minutes with the widget's refresh, so it adds no extra requests to SL.
 - **Backup, no login:** favourites, filters and settings are included in Android's own backup to the phone's Google account, and come back on a reinstall or a new phone. Departures, widget setup and other caches are left out. To move them by hand (or between copies signed with different keys), ⋮ → **Share favourites** sends them as one line of text, and ⋮ → **Import favourites** on the other phone adds them.
+- **Update notice:** sideloaded apps don't update by themselves, so once a day the app asks GitHub for the latest release. If it's newer, a banner offers **Download** (the release page) or **Not now** (hidden until the next version).
+- **Kind to SL's limits:** if SL refuses with "Quota has been exceeded", the app, the widgets and the alerts all pause together, for a minute at first and longer if SL keeps refusing (up to 15 minutes), instead of each retrying on its own.
 - **Line colours:** badges use SL's colours: red and blue buses, pink commuter trains, green/red/blue metro lines.
 - **Theme:** system default, light or dark.
 - **Language:** Swedish or English. System default picks Swedish if the phone is in Swedish.
@@ -82,6 +84,28 @@ Without them the workflow stops instead of publishing APKs that won't install ov
 
 **Back up `mysl-release.jks` and `keystore.properties` somewhere safe.** If they're lost, updates can no longer install over existing copies, and everyone has to uninstall (losing their favourites) to get a new version. To build releases on another PC, copy both files there.
 
+## Releasing
+
+1. Raise `versionCode` (+1) and `versionName` in [`app/build.gradle.kts`](app/build.gradle.kts). The release workflow stops if the tag doesn't match `versionName` or `versionCode` isn't higher than in the previous release ([`scripts/check-release-version.sh`](scripts/check-release-version.sh)).
+2. Write `release-notes/<version>.md`.
+3. Build and install it on a phone that has the previous release (`build.ps1`, then `adb install -r build/MySL-preset.apk`), and go through the checklist below.
+4. Push, then tag: `git tag 1.3.0 && git push origin 1.3.0`. The workflow builds, signs and publishes.
+
+### Phone checklist
+
+The unit tests don't cover the screens, widgets or anything that needs a real phone. Before tagging, check:
+
+- [ ] It installs **over** the previous release, and favourites, filters, theme and language are still there.
+- [ ] Departures load for every favourite; pull-to-refresh and ⟳ work.
+- [ ] **+** finds a stop by name, and **Stops near me** lists nearby ones.
+- [ ] A stop's ⋮ menu: Choose directions (hide one, the header count changes), move up/down, remove.
+- [ ] *All favourite stops* widget: shows the same stops and filters, ↻ refreshes, tapping a row opens the app, a cancelled departure is crossed out.
+- [ ] *One stop* widget: picking a stop works, and it fits 2×2.
+- [ ] ⋮ → Disruption alerts can be turned on (asks for notifications) and off.
+- [ ] ⋮ → Share favourites, then Import favourites on another phone (or after removing a stop) adds them back.
+- [ ] Theme (light, dark, system) and language (SWE, ENG) switch right away, in the app and after the widget's next redraw.
+- [ ] After publishing: on a phone with the previous version, the update banner appears (it checks at most once a day; clear the app's data or wait a day to see it sooner).
+
 ## Installing
 
 Copy the APK to the phone and open it, allowing installs from that source when Android asks. Or, with USB debugging on:
@@ -97,6 +121,8 @@ Versions from 1.0.1 on are signed with the release key. If you have an earlier c
 | File | What it does |
 |------|--------------|
 | [`SlApi.kt`](app/src/main/java/se/mybus/SlApi.kt) | Calls the SL API, retries on rate limits (HTTP 429) and on SL's occasional empty answers, and turns SL's `{"error": ...}` answers into errors |
+| [`SlCooldown.kt`](app/src/main/java/se/mybus/SlCooldown.kt) | The shared pause after SL refuses (quota), respected by every SL request in the app |
+| [`UpdateCheck.kt`](app/src/main/java/se/mybus/UpdateCheck.kt) | Once-a-day look at GitHub's latest release, for the update banner |
 | [`MainActivity.kt`](app/src/main/java/se/mybus/MainActivity.kt) | Departures screen, refresh loop, direction and line filter dialog, settings menu |
 | [`StopSearchScreen.kt`](app/src/main/java/se/mybus/StopSearchScreen.kt) / [`Search.kt`](app/src/main/java/se/mybus/Search.kt) | Stop search and "Stops near me" for adding favourites |
 | [`PhoneLocation.kt`](app/src/main/java/se/mybus/PhoneLocation.kt) | The phone's position, from Android's own location service (no Google Play services) |

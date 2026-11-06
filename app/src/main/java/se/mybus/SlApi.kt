@@ -25,7 +25,8 @@ data class Site(val id: Int, val name: String, val note: String, val lat: Double
 
 // SL answered with {"error": "..."} instead of data, e.g. "Quota has been exceeded" when too many
 // requests reach it from the same network. quota tells that case apart so it can say "try later".
-class SlApiException(message: String, val quota: Boolean) : Exception(message)
+// retryAfterMs is SL's own Retry-After, when it sent one.
+class SlApiException(message: String, val quota: Boolean, val retryAfterMs: Long? = null) : Exception(message)
 
 // SL's transport_mode values.
 enum class Mode { BUS, TRAIN, METRO, TRAM, SHIP, OTHER }
@@ -80,8 +81,20 @@ object SlApi {
         return sites
     }
 
-    // The API answers 429 when requests arrive too close together, so back off and retry.
+    // Every request goes through here, so it's also where the shared cool-down is kept: none is
+    // sent while SL is refusing us, and a refusal starts (or lengthens) the pause for everyone.
     private suspend fun fetch(url: URL): String {
+        SlCooldown.check()
+        try {
+            return fetchWithRetries(url).also { SlCooldown.succeeded() }
+        } catch (e: SlApiException) {
+            if (e.quota) SlCooldown.refused(e.retryAfterMs)
+            throw e
+        }
+    }
+
+    // The API answers 429 when requests arrive too close together, so back off and retry.
+    private suspend fun fetchWithRetries(url: URL): String {
         repeat(MAX_ATTEMPTS - 1) { attempt ->
             when (val r = get(url)) {
                 is Response.Ok -> return checkNotError(r.body)
@@ -90,7 +103,7 @@ object SlApi {
         }
         return when (val r = get(url)) {
             is Response.Ok -> checkNotError(r.body)
-            is Response.TooManyRequests -> throw SlApiException("HTTP 429", quota = true)
+            is Response.TooManyRequests -> throw SlApiException("HTTP 429", quota = true, retryAfterMs = r.retryAfterMs)
         }
     }
 

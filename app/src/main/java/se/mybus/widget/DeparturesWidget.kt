@@ -42,6 +42,7 @@ import se.mybus.Strings
 import se.mybus.lineColor
 import se.mybus.notLeftBy
 import se.mybus.stringsFor
+import se.mybus.timeLeft
 import se.mybus.visible
 import java.time.Instant
 import java.time.LocalDateTime
@@ -174,7 +175,7 @@ internal fun WidgetContent(
                             upcoming.isEmpty() -> item(itemId = nid()) { Message(s.noDepartures) }
                             shown.isEmpty() -> item(itemId = nid()) { Message(s.noDeparturesSelectedDirections) }
                             else -> for (d in shown) {
-                                item(itemId = nid()) { DepartureRowGlance(s, d) }
+                                item(itemId = nid()) { DepartureRowGlance(s, d, now) }
                             }
                         }
                     }
@@ -194,7 +195,7 @@ private fun Message(text: String) {
 }
 
 @Composable
-private fun DepartureRowGlance(s: Strings, d: Departure) {
+private fun DepartureRowGlance(s: Strings, d: Departure, now: LocalDateTime) {
     Row(
         verticalAlignment = Alignment.Vertical.CenterVertically,
         modifier = GlanceModifier.fillMaxWidth().clickable(openApp()).padding(horizontal = 14.dp, vertical = 5.dp),
@@ -225,12 +226,15 @@ private fun DepartureRowGlance(s: Strings, d: Departure) {
             }
         }
         Spacer(modifier = GlanceModifier.width(10.dp))
-        // Clock time rather than "2 min": a countdown would only be as fresh as the last redraw,
-        // a clock time is right whenever you look.
-        Text(
-            d.expected,
-            style = if (d.cancelled) TimeStyle.copy(color = WidgetError, textDecoration = strike) else TimeStyle,
-        )
+        // Time left in bold, as in the app, recounted at every minute's redraw. The clock time
+        // under it stays right even if the screen has been off and the redraw is a moment late.
+        Column(horizontalAlignment = Alignment.Horizontal.End) {
+            Text(
+                timeLeft(d, now, s),
+                style = if (d.cancelled) TimeStyle.copy(color = WidgetError, textDecoration = strike) else TimeStyle,
+            )
+            Text(d.expected, style = UpdatedStyle)
+        }
     }
 }
 

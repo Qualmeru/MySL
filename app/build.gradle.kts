@@ -50,8 +50,8 @@ android {
         applicationId = "se.mybus"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "1.1.0"
+        versionCode = 4
+        versionName = "1.2.0"
         // The app only speaks Swedish and English; this drops the libraries' texts in ~80 other
         // languages (Compose, Material...) that would never be shown next to ours anyway.
         resourceConfigurations += listOf("en", "sv")

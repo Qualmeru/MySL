@@ -55,6 +55,7 @@ abstract class Strings {
     abstract val moveUp: String
     abstract val moveDown: String
     abstract fun linesHidden(n: Int): String
+    abstract fun departuresHidden(n: Int): String
     abstract val nearbyStops: String
     abstract val findingLocation: String
     abstract val locationDenied: String
@@ -67,6 +68,13 @@ abstract class Strings {
     abstract val pickStopTitle: String
     abstract val pickStopEmpty: String
     abstract val stopRemoved: String
+    abstract val exportFavorites: String
+    abstract val importFavorites: String
+    abstract fun exportMessage(code: String): String
+    abstract val importHint: String
+    abstract val importAction: String
+    abstract val importInvalid: String
+    abstract fun imported(n: Int): String
 
     // SL sends "Nu" for departures leaving now; "3 min" and "21:22" read the same in both languages.
     fun display(slDisplay: String) = if (slDisplay == "Nu") now else slDisplay
@@ -133,6 +141,7 @@ object Swedish : Strings() {
     override val moveUp = "Flytta upp"
     override val moveDown = "Flytta ner"
     override fun linesHidden(n: Int) = if (n == 1) "1 linje dold" else "$n linjer dolda"
+    override fun departuresHidden(n: Int) = if (n == 1) "1 avgång dold" else "$n avgångar dolda"
     override val nearbyStops = "Hållplatser nära mig"
     override val findingLocation = "Hämtar din position…"
     override val locationDenied = "Appen fick inte använda din position."
@@ -145,6 +154,14 @@ object Swedish : Strings() {
     override val pickStopTitle = "Välj hållplats för widgeten"
     override val pickStopEmpty = "Lägg till en favorithållplats i appen först."
     override val stopRemoved = "Hållplatsen finns inte längre bland dina favoriter. Ta bort widgeten och lägg till den igen."
+    override val exportFavorites = "Dela favoriter"
+    override val importFavorites = "Importera favoriter"
+    override fun exportMessage(code: String) =
+        "Mina hållplatser i MySL. Kopiera hela meddelandet och välj ⋮ → Importera favoriter i appen:\n$code"
+    override val importHint = "Klistra in meddelandet med favoriterna"
+    override val importAction = "Importera"
+    override val importInvalid = "Hittar inga favoriter i texten. Klistra in hela meddelandet från Dela favoriter."
+    override fun imported(n: Int) = if (n == 1) "1 hållplats importerad" else "$n hållplatser importerade"
 }
 
 object English : Strings() {
@@ -208,6 +225,7 @@ object English : Strings() {
     override val moveUp = "Move up"
     override val moveDown = "Move down"
     override fun linesHidden(n: Int) = if (n == 1) "1 line hidden" else "$n lines hidden"
+    override fun departuresHidden(n: Int) = if (n == 1) "1 departure hidden" else "$n departures hidden"
     override val nearbyStops = "Stops near me"
     override val findingLocation = "Finding your location…"
     override val locationDenied = "The app wasn't allowed to use your location."
@@ -220,6 +238,14 @@ object English : Strings() {
     override val pickStopTitle = "Choose a stop for the widget"
     override val pickStopEmpty = "Add a favourite stop in the app first."
     override val stopRemoved = "This stop is no longer one of your favourites. Remove the widget and add it again."
+    override val exportFavorites = "Share favourites"
+    override val importFavorites = "Import favourites"
+    override fun exportMessage(code: String) =
+        "My stops in MySL. Copy this whole message and choose ⋮ → Import favourites in the app:\n$code"
+    override val importHint = "Paste the message with the favourites"
+    override val importAction = "Import"
+    override val importInvalid = "No favourites found in that text. Paste the whole message from Share favourites."
+    override fun imported(n: Int) = if (n == 1) "1 stop imported" else "$n stops imported"
 }
 
 fun stringsFor(language: Language): Strings = when (language) {

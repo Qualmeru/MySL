@@ -41,6 +41,8 @@ class StringsTest {
         assertEquals("2 riktningar dolda", Swedish.directionsHidden(2))
         assertEquals("1 line hidden", English.linesHidden(1))
         assertEquals("3 lines hidden", English.linesHidden(3))
+        assertEquals("1 avgång dold", Swedish.departuresHidden(1))
+        assertEquals("5 departures hidden", English.departuresHidden(5))
     }
 
     @Test

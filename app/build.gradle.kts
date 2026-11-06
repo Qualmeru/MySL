@@ -52,6 +52,16 @@ android {
         targetSdk = 35
         versionCode = 3
         versionName = "1.1.0"
+        // The app only speaks Swedish and English; this drops the libraries' texts in ~80 other
+        // languages (Compose, Material...) that would never be shown next to ours anyway.
+        resourceConfigurations += listOf("en", "sv")
+    }
+
+    packaging {
+        resources {
+            // Only read by kotlin-reflect and the coroutines debug agent, neither of which ships.
+            excludes += listOf("kotlin/**", "DebugProbesKt.bin", "kotlin-tooling-metadata.json", "META-INF/*.version")
+        }
     }
 
     compileOptions {

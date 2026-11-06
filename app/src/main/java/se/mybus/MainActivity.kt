@@ -1,6 +1,7 @@
 package se.mybus
 
 import android.Manifest
+import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -24,6 +25,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -62,6 +64,9 @@ sealed interface StopState {
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Settings restored from a backup (new phone, reinstall) can have alerts on without the
+        // background check scheduled; this puts that right. Does nothing if it already is.
+        WidgetUpdates.sync(this)
         setContent {
             var themeMode by remember { mutableStateOf(Settings.loadTheme(this)) }
             var language by remember { mutableStateOf(Settings.loadLanguage(this)) }
@@ -100,8 +105,10 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = appColorScheme(dark, LocalContext.current)) {
                 CompositionLocalProvider(LocalStrings provides strings) {
                     App(
-                        settingsMenu = {
+                        settingsMenu = { favorites, onImport ->
                             SettingsMenu(
+                                favorites = favorites,
+                                onImport = onImport,
                                 themeMode = themeMode,
                                 onThemeMode = { themeMode = it; Settings.saveTheme(this, it) },
                                 language = language,
@@ -123,8 +130,9 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+// settingsMenu gets the favourites to share, and a way to add imported ones.
 @Composable
-fun App(settingsMenu: @Composable () -> Unit) {
+fun App(settingsMenu: @Composable (List<Stop>, (List<Stop>) -> Unit) -> Unit) {
     val context = LocalContext.current
     var favorites by remember { mutableStateOf(Favorites.load(context)) }
     var searching by rememberSaveable { mutableStateOf(false) }
@@ -148,7 +156,7 @@ fun App(settingsMenu: @Composable () -> Unit) {
         DeparturesScreen(
             favorites = favorites,
             states = states,
-            settingsMenu = settingsMenu,
+            settingsMenu = { settingsMenu(favorites) { imported -> setFavorites(favorites.mergedWith(imported)) } },
             onAdd = { searching = true },
             onRemove = { stop -> setFavorites(favorites.filter { it.siteId != stop.siteId }) },
             onMove = { stop, by -> setFavorites(favorites.move(stop.siteId, by)) },
@@ -254,9 +262,13 @@ fun DeparturesScreen(
                     item { Message(s.noFavorites) }
                 }
                 favorites.forEachIndexed { index, stop ->
+                    // Departures within the hour that this stop's filters are keeping out of the list.
+                    val hiddenDepartures = (states[stop.siteId] as? StopState.Loaded)
+                        ?.departures?.let { it.size - stop.visible(it).size } ?: 0
                     item(key = "h${stop.siteId}") {
                         StopHeader(
                             stop = stop,
+                            hiddenDepartures = hiddenDepartures,
                             canMoveUp = index > 0,
                             canMoveDown = index < favorites.lastIndex,
                             onMove = { by -> onMove(stop, by) },
@@ -314,9 +326,13 @@ private fun SettingsMenu(
     onLanguage: (Language) -> Unit,
     alerts: Boolean,
     onAlerts: (Boolean) -> Unit,
+    favorites: List<Stop>,
+    onImport: (List<Stop>) -> Unit,
 ) {
     val s = LocalStrings.current
+    val context = LocalContext.current
     var open by remember { mutableStateOf(false) }
+    var importing by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
             Icon(Icons.Default.MoreVert, contentDescription = s.settings)
@@ -368,8 +384,72 @@ private fun SettingsMenu(
                 open = false
                 onAlerts(!alerts)
             }
+            HorizontalDivider()
+            if (favorites.isNotEmpty()) {
+                DropdownMenuItem(
+                    text = { Text(s.exportFavorites) },
+                    leadingIcon = { Icon(Icons.Default.Share, contentDescription = null) },
+                    onClick = {
+                        open = false
+                        val send = Intent(Intent.ACTION_SEND)
+                            .setType("text/plain")
+                            .putExtra(Intent.EXTRA_TEXT, s.exportMessage(FavoritesCode.export(favorites)))
+                        context.startActivity(Intent.createChooser(send, s.exportFavorites))
+                    },
+                )
+            }
+            DropdownMenuItem(
+                text = { Text(s.importFavorites) },
+                leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
+                onClick = { open = false; importing = true },
+            )
         }
     }
+
+    if (importing) {
+        ImportDialog(
+            onImport = { stops ->
+                onImport(stops)
+                importing = false
+                Toast.makeText(context, s.imported(stops.size), Toast.LENGTH_SHORT).show()
+            },
+            onDismiss = { importing = false },
+        )
+    }
+}
+
+@Composable
+private fun ImportDialog(onImport: (List<Stop>) -> Unit, onDismiss: () -> Unit) {
+    val s = LocalStrings.current
+    var text by remember { mutableStateOf("") }
+    var invalid by remember { mutableStateOf(false) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(s.importFavorites) },
+        text = {
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it; invalid = false },
+                placeholder = { Text(s.importHint) },
+                isError = invalid,
+                supportingText = if (invalid) {
+                    { Text(s.importInvalid) }
+                } else null,
+                maxLines = 5,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        },
+        confirmButton = {
+            TextButton(
+                enabled = text.isNotBlank(),
+                onClick = {
+                    val stops = FavoritesCode.import(text)
+                    if (stops.isNullOrEmpty()) invalid = true else onImport(stops)
+                },
+            ) { Text(s.importAction) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(s.cancel) } },
+    )
 }
 
 @Composable
@@ -403,6 +483,7 @@ private fun CheckedMenuItem(
 @Composable
 private fun StopHeader(
     stop: Stop,
+    hiddenDepartures: Int,
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onMove: (Int) -> Unit,
@@ -420,6 +501,7 @@ private fun StopHeader(
             val hiddenNote = listOfNotNull(
                 s.directionsHidden(stop.hiddenStopPoints.size).takeIf { stop.hiddenStopPoints.isNotEmpty() },
                 s.linesHidden(stop.hiddenLines.size).takeIf { stop.hiddenLines.isNotEmpty() },
+                s.departuresHidden(hiddenDepartures).takeIf { hiddenDepartures > 0 },
             ).joinToString(" · ")
             if (hiddenNote.isNotEmpty()) {
                 Text(

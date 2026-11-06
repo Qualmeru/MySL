@@ -3,6 +3,7 @@ package se.mybus
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.Base64
 
 // Favourite stops, kept in SharedPreferences as a JSON array of
 // {id, name, hidden: [stop point ids], hiddenLines: [line designations]}, in the order shown.
@@ -61,6 +62,35 @@ object Favorites {
     }
 
     private fun prefs(context: Context) = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+}
+
+// Favourites as one line of text to share and paste on another phone: no account or server,
+// and it works between copies signed with different keys, where Android's backup doesn't.
+// "MYSL1:" marks the format (the 1 is its version), then the saved JSON as URL-safe Base64 so
+// chat apps don't mangle quotes or Swedish letters.
+object FavoritesCode {
+    private const val PREFIX = "MYSL1:"
+    private val code = Regex("""MYSL1:([A-Za-z0-9_-]+)""")
+
+    fun export(stops: List<Stop>): String =
+        PREFIX + Base64.getUrlEncoder().withoutPadding().encodeToString(Favorites.encode(stops).toByteArray())
+
+    // Finds the code anywhere in the pasted text (it's usually inside a message). Null if there's
+    // none or it doesn't read back as stops.
+    fun import(text: String): List<Stop>? {
+        val match = code.find(text) ?: return null
+        return runCatching {
+            Favorites.decode(String(Base64.getUrlDecoder().decode(match.groupValues[1])))
+        }.getOrNull()
+    }
+}
+
+// Adds imported stops to these: a stop that's already here takes the imported filters and keeps
+// its place, new ones go at the end in the imported order.
+fun List<Stop>.mergedWith(imported: List<Stop>): List<Stop> {
+    val byId = imported.associateBy { it.siteId }
+    val ids = map { it.siteId }.toSet()
+    return map { byId[it.siteId] ?: it } + imported.filter { it.siteId !in ids }
 }
 
 // Moves the stop with this id one place up (by = -1) or down (by = 1); unchanged at either end.

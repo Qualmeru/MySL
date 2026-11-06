@@ -1,7 +1,9 @@
 package se.mybus
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertSame
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class FavoritesTest {
@@ -37,6 +39,42 @@ class FavoritesTest {
     fun `drops duplicate stops, keeping the first`() {
         val dup = """[{"id": 1, "name": "First"}, {"id": 1, "name": "Second"}]"""
         assertEquals(listOf(Stop(1, "First")), Favorites.decode(dup))
+    }
+
+    @Test
+    fun `share code round trips stops, filters and Swedish names`() {
+        val stops = listOf(c, a, b)
+        val code = FavoritesCode.export(stops)
+        assertTrue(code, code.startsWith("MYSL1:"))
+        // One line, nothing a chat app would mangle.
+        assertTrue(code, code.drop(6).all { it.isLetterOrDigit() || it == '-' || it == '_' })
+        assertEquals(stops, FavoritesCode.import(code))
+    }
+
+    @Test
+    fun `finds the code inside a pasted message`() {
+        val message = English.exportMessage(FavoritesCode.export(listOf(b)))
+        assertEquals(listOf(b), FavoritesCode.import("Forwarded:\n\n$message\n\nSent from my phone"))
+    }
+
+    @Test
+    fun `rejects text without a valid code`() {
+        assertNull(FavoritesCode.import(""))
+        assertNull(FavoritesCode.import("hello"))
+        assertNull(FavoritesCode.import("MYSL1:"))
+        // Valid Base64, but not favourites.
+        assertNull(FavoritesCode.import("MYSL1:" + java.util.Base64.getUrlEncoder().encodeToString("nope".toByteArray())))
+        // A future format this version can't read.
+        assertNull(FavoritesCode.import(FavoritesCode.export(listOf(a)).replace("MYSL1:", "MYSL2:")))
+    }
+
+    @Test
+    fun `importing adds new stops and updates filters of existing ones in place`() {
+        val mine = listOf(a, b)
+        val bChanged = b.copy(hiddenLines = setOf("1"), hiddenStopPoints = emptySet())
+        assertEquals(listOf(a, bChanged, c), mine.mergedWith(listOf(c, bChanged)))
+        assertEquals(mine, mine.mergedWith(emptyList()))
+        assertEquals(listOf(c), emptyList<Stop>().mergedWith(listOf(c)))
     }
 
     @Test

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: what Android's own backup (to the Google account) and phone-to-phone transfer
+     keep. Only favourites with their filters, and settings: departures are stale by the time
+     they'd be restored, widget ids belong to the old phone, and WorkManager's and Glance's own
+     files shouldn't be moved between phones. See backup_rules.xml for Android 11 and older. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <include domain="sharedpref" path="favorites.xml" />
+        <include domain="sharedpref" path="settings.xml" />
+    </cloud-backup>
+    <device-transfer>
+        <include domain="sharedpref" path="favorites.xml" />
+        <include domain="sharedpref" path="settings.xml" />
+    </device-transfer>
+</data-extraction-rules>

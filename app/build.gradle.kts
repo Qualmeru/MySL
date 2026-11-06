@@ -36,7 +36,14 @@ android {
         }
         // Debug builds use the release key too, so switching between debug and release keeps your data.
         getByName("debug") { if (releaseKey != null) signingConfig = releaseKey }
-        getByName("release") { signingConfig = releaseKey ?: signingConfigs.getByName("debug") }
+        getByName("release") {
+            signingConfig = releaseKey ?: signingConfigs.getByName("debug")
+            // Strips unused code and resources (mostly from Compose and the icon set): a much
+            // smaller APK. Rules for what must survive are in proguard-rules.pro.
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
     }
 
     defaultConfig {
@@ -83,4 +90,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+
+    testImplementation("junit:junit:4.13.2")
+    // android.jar's org.json is a stub that throws in JVM unit tests; this is the real thing.
+    testImplementation("org.json:json:20240303")
 }

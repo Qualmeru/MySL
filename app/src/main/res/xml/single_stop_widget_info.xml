@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One favourite stop. Fits a 2×2 spot; updates come from WorkManager, not updatePeriodMillis. -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="80dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:updatePeriodMillis="0"
+    android:resizeMode="horizontal|vertical"
+    android:widgetCategory="home_screen"
+    android:configure="se.mybus.widget.PickStopActivity"
+    android:widgetFeatures="reconfigurable"
+    android:initialLayout="@layout/widget_loading" />

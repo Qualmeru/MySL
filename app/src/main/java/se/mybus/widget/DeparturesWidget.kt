@@ -40,7 +40,9 @@ import se.mybus.SlApi
 import se.mybus.Stop
 import se.mybus.Strings
 import se.mybus.lineColor
+import se.mybus.notLeftBy
 import se.mybus.stringsFor
+import se.mybus.visible
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -67,7 +69,26 @@ private val NoticeStyle = TextStyle(fontSize = 13.sp, color = WidgetError)
 private val HourMinute = DateTimeFormatter.ofPattern("HH:mm")
 
 // What one stop shows: cached departures (possibly older, if the last refresh failed) and/or an error.
-private class StopView(val stop: Stop, val departures: List<Departure>?, val error: String?)
+internal class StopView(val stop: Stop, val departures: List<Departure>?, val error: String?)
+
+internal fun loadViews(context: Context, stops: List<Stop>): List<StopView> = stops.map { stop ->
+    val entry = WidgetCache.load(context, stop.siteId)
+    // A cache entry that no longer parses is treated like no data, rather than breaking the widget.
+    val departures = entry?.body?.let { body -> runCatching { SlApi.parseDepartures(body) }.getOrNull() }
+    StopView(stop, departures, entry?.error)
+}
+
+internal fun lastFetchOf(context: Context, stops: List<Stop>): Long? =
+    stops.mapNotNull { WidgetCache.load(context, it.siteId)?.fetchedAt }.filter { it > 0 }.maxOrNull()
+
+// E.g. right after installing this version, or after adding a stop: nothing cached yet, so fetch.
+internal fun ensureFetching(context: Context) {
+    if (Favorites.load(context).any { WidgetCache.load(context, it.siteId) == null }) {
+        WidgetUpdates.schedule(context)
+        WidgetUpdates.refreshNow(context)
+        MinuteRedraw.start(context)
+    }
+}
 
 class DeparturesWidget : GlanceAppWidget() {
 
@@ -75,24 +96,13 @@ class DeparturesWidget : GlanceAppWidget() {
     // CacheVersionKey, which recomposes this from the cache. MinuteRedraw bumps it too, so
     // departures that have left drop off within a minute.
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // E.g. right after installing this version, or after adding a stop: nothing cached yet.
-        if (Favorites.load(context).any { WidgetCache.load(context, it.siteId) == null }) {
-            WidgetUpdates.schedule(context)
-            WidgetUpdates.refreshNow(context)
-            MinuteRedraw.start(context)
-        }
+        ensureFetching(context)
         provideContent {
             currentState(CacheVersionKey)
             val ctx = LocalContext.current
             val s = stringsFor(Settings.loadLanguage(ctx))
             val stops = Favorites.load(ctx)
-            val entries = stops.associate { it.siteId to WidgetCache.load(ctx, it.siteId) }
-            val views = stops.map { stop ->
-                val entry = entries[stop.siteId]
-                StopView(stop, entry?.body?.let { SlApi.parseDepartures(it) }, entry?.error)
-            }
-            val lastFetch = entries.values.mapNotNull { it?.fetchedAt }.filter { it > 0 }.maxOrNull()
-            WidgetContent(s, views, lastFetch)
+            WidgetContent(s, s.title, loadViews(ctx, stops), lastFetchOf(ctx, stops), showStopNames = true)
         }
     }
 }
@@ -102,14 +112,22 @@ class DeparturesWidget : GlanceAppWidget() {
 private fun openApp() = actionStartActivity<MainActivity>()
 
 @Composable
-private fun WidgetContent(s: Strings, views: List<StopView>, lastFetch: Long?) {
+internal fun WidgetContent(
+    s: Strings,
+    title: String,
+    views: List<StopView>,
+    lastFetch: Long?,
+    showStopNames: Boolean,
+    maxPerStop: Int = MAX_PER_STOP_WIDGET,
+    emptyText: String = s.noFavorites,
+) {
     Column(modifier = GlanceModifier.fillMaxSize().background(WidgetBackground).clickable(openApp())) {
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
             verticalAlignment = Alignment.Vertical.CenterVertically,
         ) {
             Column(modifier = GlanceModifier.defaultWeight().clickable(openApp())) {
-                Text(s.title, style = TitleStyle)
+                Text(title, style = TitleStyle, maxLines = 1)
                 if (lastFetch != null) {
                     val time = Instant.ofEpochMilli(lastFetch).atZone(ZoneId.systemDefault()).format(HourMinute)
                     Text(s.updated(time), style = UpdatedStyle)
@@ -124,24 +142,25 @@ private fun WidgetContent(s: Strings, views: List<StopView>, lastFetch: Long?) {
 
         var nextId = 0L
         fun nid() = nextId++
-        // Departures that left since the last fetch are dropped (a minute's grace for "Nu").
-        val now = LocalDateTime.now().minusMinutes(1)
+        val now = LocalDateTime.now()
 
         LazyColumn(modifier = GlanceModifier.fillMaxSize()) {
             if (views.isEmpty()) {
-                item(itemId = nid()) { Message(s.noFavorites) }
+                item(itemId = nid()) { Message(emptyText) }
             }
             for (view in views) {
                 val stop = view.stop
-                item(itemId = nid()) {
-                    Text(
-                        stop.name,
-                        style = StopStyle,
-                        modifier = GlanceModifier
-                            .fillMaxWidth()
-                            .clickable(openApp())
-                            .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 4.dp),
-                    )
+                if (showStopNames) {
+                    item(itemId = nid()) {
+                        Text(
+                            stop.name,
+                            style = StopStyle,
+                            modifier = GlanceModifier
+                                .fillMaxWidth()
+                                .clickable(openApp())
+                                .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 4.dp),
+                        )
+                    }
                 }
                 val departures = view.departures
                 when {
@@ -149,10 +168,8 @@ private fun WidgetContent(s: Strings, views: List<StopView>, lastFetch: Long?) {
                     departures == null -> item(itemId = nid()) { Message(s.loading) }
                     else -> {
                         view.error?.let { item(itemId = nid()) { Message(s.couldNotRefresh(it)) } }
-                        val upcoming = departures.filter { it.expectedAt == null || it.expectedAt >= now }
-                        val shown = upcoming
-                            .filter { it.stopPointId !in stop.hiddenStopPoints && it.line !in stop.hiddenLines }
-                            .take(MAX_PER_STOP_WIDGET)
+                        val upcoming = departures.notLeftBy(now)
+                        val shown = stop.visible(upcoming).take(maxPerStop)
                         when {
                             upcoming.isEmpty() -> item(itemId = nid()) { Message(s.noDepartures) }
                             shown.isEmpty() -> item(itemId = nid()) { Message(s.noDeparturesSelectedDirections) }

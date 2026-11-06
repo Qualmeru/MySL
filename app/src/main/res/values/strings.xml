@@ -1,3 +1,6 @@
 <resources>
-    <string name="app_name">MySL</string>
+    <string name="app_name" translatable="false">MySL</string>
+    <!-- Names in the launcher's widget list, which follows the phone's language. -->
+    <string name="widget_all_stops">All favourite stops</string>
+    <string name="widget_one_stop">One stop</string>
 </resources>

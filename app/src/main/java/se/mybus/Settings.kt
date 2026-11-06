@@ -16,12 +16,17 @@ object Settings {
     private const val PREFS = "settings"
     private const val THEME = "theme"
     private const val LANGUAGE = "language"
+    private const val ALERTS = "disruption_alerts"
 
     fun loadTheme(context: Context): ThemeMode = load(context, THEME, ThemeMode.SYSTEM)
     fun saveTheme(context: Context, mode: ThemeMode) = save(context, THEME, mode)
 
     fun loadLanguage(context: Context): Language = load(context, LANGUAGE, Language.SYSTEM)
     fun saveLanguage(context: Context, language: Language) = save(context, LANGUAGE, language)
+
+    // Off until turned on in the menu: notifications are opt-in.
+    fun loadAlerts(context: Context): Boolean = prefs(context).getBoolean(ALERTS, false)
+    fun saveAlerts(context: Context, on: Boolean) = prefs(context).edit().putBoolean(ALERTS, on).apply()
 
     private inline fun <reified T : Enum<T>> load(context: Context, key: String, default: T): T =
         prefs(context).getString(key, null)

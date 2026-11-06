@@ -51,6 +51,22 @@ abstract class Strings {
     abstract val added: String
     abstract val noInternet: String
     abstract val connectionFailed: String
+    abstract val slBusy: String
+    abstract val moveUp: String
+    abstract val moveDown: String
+    abstract fun linesHidden(n: Int): String
+    abstract val nearbyStops: String
+    abstract val findingLocation: String
+    abstract val locationDenied: String
+    abstract val locationUnavailable: String
+    abstract fun metresAway(m: Int): String
+    abstract val disruptionAlerts: String
+    abstract val notificationsDenied: String
+    abstract fun disruptionTitle(stop: String): String
+    abstract fun lineCancelled(line: String, destination: String, time: String): String
+    abstract val pickStopTitle: String
+    abstract val pickStopEmpty: String
+    abstract val stopRemoved: String
 
     // SL sends "Nu" for departures leaving now; "3 min" and "21:22" read the same in both languages.
     fun display(slDisplay: String) = if (slDisplay == "Nu") now else slDisplay
@@ -113,6 +129,22 @@ object Swedish : Strings() {
     override val added = "Tillagd"
     override val noInternet = "Ingen internetanslutning"
     override val connectionFailed = "Kunde inte nå SL, försök igen"
+    override val slBusy = "SL har för många förfrågningar just nu, försök igen om en stund"
+    override val moveUp = "Flytta upp"
+    override val moveDown = "Flytta ner"
+    override fun linesHidden(n: Int) = if (n == 1) "1 linje dold" else "$n linjer dolda"
+    override val nearbyStops = "Hållplatser nära mig"
+    override val findingLocation = "Hämtar din position…"
+    override val locationDenied = "Appen fick inte använda din position."
+    override val locationUnavailable = "Kunde inte hitta din position. Är platstjänster på?"
+    override fun metresAway(m: Int) = if (m < 1000) "$m m" else "%.1f km".format(Locale.ROOT, m / 1000.0).replace('.', ',')
+    override val disruptionAlerts = "Störningsaviseringar"
+    override val notificationsDenied = "Appen fick inte visa aviseringar."
+    override fun disruptionTitle(stop: String) = "Störning vid $stop"
+    override fun lineCancelled(line: String, destination: String, time: String) = "$line mot $destination $time är inställd"
+    override val pickStopTitle = "Välj hållplats för widgeten"
+    override val pickStopEmpty = "Lägg till en favorithållplats i appen först."
+    override val stopRemoved = "Hållplatsen finns inte längre bland dina favoriter. Ta bort widgeten och lägg till den igen."
 }
 
 object English : Strings() {
@@ -172,6 +204,22 @@ object English : Strings() {
     override val added = "Added"
     override val noInternet = "No internet connection"
     override val connectionFailed = "Couldn't reach SL, try again"
+    override val slBusy = "SL is getting too many requests right now, try again in a while"
+    override val moveUp = "Move up"
+    override val moveDown = "Move down"
+    override fun linesHidden(n: Int) = if (n == 1) "1 line hidden" else "$n lines hidden"
+    override val nearbyStops = "Stops near me"
+    override val findingLocation = "Finding your location…"
+    override val locationDenied = "The app wasn't allowed to use your location."
+    override val locationUnavailable = "Couldn't find your location. Is location turned on?"
+    override fun metresAway(m: Int) = if (m < 1000) "$m m" else "%.1f km".format(Locale.ROOT, m / 1000.0)
+    override val disruptionAlerts = "Disruption alerts"
+    override val notificationsDenied = "The app wasn't allowed to show notifications."
+    override fun disruptionTitle(stop: String) = "Disruption at $stop"
+    override fun lineCancelled(line: String, destination: String, time: String) = "$line to $destination at $time is cancelled"
+    override val pickStopTitle = "Choose a stop for the widget"
+    override val pickStopEmpty = "Add a favourite stop in the app first."
+    override val stopRemoved = "This stop is no longer one of your favourites. Remove the widget and add it again."
 }
 
 fun stringsFor(language: Language): Strings = when (language) {
@@ -191,6 +239,7 @@ val LocalStrings = staticCompositionLocalOf<Strings> { Swedish }
 fun friendlyError(e: Exception, s: Strings): String {
     var cause: Throwable? = e
     while (cause != null) {
+        if (cause is SlApiException && cause.quota) return s.slBusy
         if (cause is UnknownHostException) return s.noInternet
         if (cause is java.net.ConnectException || cause is java.net.SocketTimeoutException) return s.connectionFailed
         cause = cause.cause

@@ -1,0 +1,4 @@
+<resources>
+    <string name="widget_all_stops">Alla favorithållplatser</string>
+    <string name="widget_one_stop">En hållplats</string>
+</resources>

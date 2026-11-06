@@ -1,11 +1,14 @@
 package se.mybus
 
-import android.os.Build
+import android.Manifest
 import android.os.Bundle
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -19,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -79,14 +83,22 @@ class MainActivity : ComponentActivity() {
                 )
                 onDispose {}
             }
-            val ctx = LocalContext.current
-            val colors = if (Build.VERSION.SDK_INT >= 31) {
-                if (dark) dynamicDarkColorScheme(ctx) else dynamicLightColorScheme(ctx)
-            } else {
-                if (dark) darkColorScheme() else lightColorScheme()
+            var alerts by remember { mutableStateOf(Settings.loadAlerts(this)) }
+            val strings = stringsFor(language)
+            fun setAlerts(on: Boolean) {
+                alerts = on
+                Settings.saveAlerts(this, on)
+                if (on) DisruptionAlerts.forgetSeen(this)
+                WidgetUpdates.sync(this)
+                // Check right away rather than in up to 15 minutes.
+                if (on) WidgetUpdates.refreshNow(this)
             }
-            MaterialTheme(colorScheme = colors) {
-                CompositionLocalProvider(LocalStrings provides stringsFor(language)) {
+            val askNotifications = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+                if (granted) setAlerts(true)
+                else Toast.makeText(this, strings.notificationsDenied, Toast.LENGTH_LONG).show()
+            }
+            MaterialTheme(colorScheme = appColorScheme(dark, LocalContext.current)) {
+                CompositionLocalProvider(LocalStrings provides strings) {
                     App(
                         settingsMenu = {
                             SettingsMenu(
@@ -94,6 +106,14 @@ class MainActivity : ComponentActivity() {
                                 onThemeMode = { themeMode = it; Settings.saveTheme(this, it) },
                                 language = language,
                                 onLanguage = { language = it; Settings.saveLanguage(this, it) },
+                                alerts = alerts,
+                                onAlerts = { on ->
+                                    if (on && !DisruptionAlerts.canNotify(this)) {
+                                        askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    } else {
+                                        setAlerts(on)
+                                    }
+                                },
                             )
                         },
                     )
@@ -131,6 +151,7 @@ fun App(settingsMenu: @Composable () -> Unit) {
             settingsMenu = settingsMenu,
             onAdd = { searching = true },
             onRemove = { stop -> setFavorites(favorites.filter { it.siteId != stop.siteId }) },
+            onMove = { stop, by -> setFavorites(favorites.move(stop.siteId, by)) },
             onSetHidden = { stop, hidden, hiddenLines ->
                 setFavorites(favorites.map {
                     if (it.siteId == stop.siteId) it.copy(hiddenStopPoints = hidden, hiddenLines = hiddenLines) else it
@@ -148,6 +169,7 @@ fun DeparturesScreen(
     settingsMenu: @Composable () -> Unit,
     onAdd: () -> Unit,
     onRemove: (Stop) -> Unit,
+    onMove: (Stop, Int) -> Unit,
     onSetHidden: (Stop, Set<Int>, Set<String>) -> Unit,
 ) {
     val s = LocalStrings.current
@@ -231,10 +253,13 @@ fun DeparturesScreen(
                 if (favorites.isEmpty()) {
                     item { Message(s.noFavorites) }
                 }
-                for (stop in favorites) {
+                favorites.forEachIndexed { index, stop ->
                     item(key = "h${stop.siteId}") {
                         StopHeader(
                             stop = stop,
+                            canMoveUp = index > 0,
+                            canMoveDown = index < favorites.lastIndex,
+                            onMove = { by -> onMove(stop, by) },
                             onFilter = { filtering = stop },
                             onRemove = { confirmRemove = stop },
                         )
@@ -244,9 +269,7 @@ fun DeparturesScreen(
                         is StopState.Failed -> item { Message(s.couldNotFetch(state.message)) }
                         is StopState.Loaded -> {
                             state.refreshError?.let { item { Message(s.couldNotRefresh(it)) } }
-                            val shown = state.departures
-                                .filter { it.stopPointId !in stop.hiddenStopPoints && it.line !in stop.hiddenLines }
-                                .take(MAX_PER_STOP)
+                            val shown = stop.visible(state.departures).take(MAX_PER_STOP)
                             when {
                                 state.departures.isEmpty() -> item { Message(s.noDepartures) }
                                 shown.isEmpty() -> item { Message(s.noDeparturesSelectedDirections) }
@@ -289,6 +312,8 @@ private fun SettingsMenu(
     onThemeMode: (ThemeMode) -> Unit,
     language: Language,
     onLanguage: (Language) -> Unit,
+    alerts: Boolean,
+    onAlerts: (Boolean) -> Unit,
 ) {
     val s = LocalStrings.current
     var open by remember { mutableStateOf(false) }
@@ -334,6 +359,15 @@ private fun SettingsMenu(
                     onLanguage(lang)
                 }
             }
+            HorizontalDivider()
+            CheckedMenuItem(
+                s.disruptionAlerts,
+                checked = alerts,
+                leading = { Icon(Icons.Default.Notifications, contentDescription = null) },
+            ) {
+                open = false
+                onAlerts(!alerts)
+            }
         }
     }
 }
@@ -367,7 +401,14 @@ private fun CheckedMenuItem(
 }
 
 @Composable
-private fun StopHeader(stop: Stop, onFilter: () -> Unit, onRemove: () -> Unit) {
+private fun StopHeader(
+    stop: Stop,
+    canMoveUp: Boolean,
+    canMoveDown: Boolean,
+    onMove: (Int) -> Unit,
+    onFilter: () -> Unit,
+    onRemove: () -> Unit,
+) {
     val s = LocalStrings.current
     var menuOpen by remember { mutableStateOf(false) }
     Row(
@@ -376,9 +417,13 @@ private fun StopHeader(stop: Stop, onFilter: () -> Unit, onRemove: () -> Unit) {
     ) {
         Column(Modifier.weight(1f)) {
             Text(stop.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
-            if (stop.hiddenStopPoints.isNotEmpty()) {
+            val hiddenNote = listOfNotNull(
+                s.directionsHidden(stop.hiddenStopPoints.size).takeIf { stop.hiddenStopPoints.isNotEmpty() },
+                s.linesHidden(stop.hiddenLines.size).takeIf { stop.hiddenLines.isNotEmpty() },
+            ).joinToString(" · ")
+            if (hiddenNote.isNotEmpty()) {
                 Text(
-                    s.directionsHidden(stop.hiddenStopPoints.size),
+                    hiddenNote,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.primary,
                 )
@@ -393,6 +438,18 @@ private fun StopHeader(stop: Stop, onFilter: () -> Unit, onRemove: () -> Unit) {
                     text = { Text(s.chooseDirections) },
                     onClick = { menuOpen = false; onFilter() },
                 )
+                if (canMoveUp) {
+                    DropdownMenuItem(
+                        text = { Text(s.moveUp) },
+                        onClick = { menuOpen = false; onMove(-1) },
+                    )
+                }
+                if (canMoveDown) {
+                    DropdownMenuItem(
+                        text = { Text(s.moveDown) },
+                        onClick = { menuOpen = false; onMove(1) },
+                    )
+                }
                 DropdownMenuItem(
                     text = { Text(s.remove) },
                     onClick = { menuOpen = false; onRemove() },
@@ -401,32 +458,6 @@ private fun StopHeader(stop: Stop, onFilter: () -> Unit, onRemove: () -> Unit) {
         }
     }
 }
-
-// A stop point is one side of the street or one platform/track, so it stands for a direction.
-// Trains and buses at the same station use different stop points, so this also filters by mode.
-private data class Direction(
-    val stopPointId: Int,
-    val mode: Mode,
-    val platform: String,
-    val destinations: List<String>,
-)
-
-private fun directionsOf(departures: List<Departure>): List<Direction> =
-    departures.groupBy { it.stopPointId }.map { (id, deps) ->
-        Direction(
-            stopPointId = id,
-            mode = deps.first().mode,
-            platform = deps.first().platform,
-            destinations = deps.groupingBy { it.destination }.eachCount()
-                .entries.sortedByDescending { it.value }.map { it.key },
-        )
-    }.sortedWith(compareBy({ it.mode }, { it.platform }, { it.destinations.firstOrNull() }))
-
-private data class LineEntry(val line: String, val mode: Mode)
-
-private fun linesOf(departures: List<Departure>): List<LineEntry> =
-    departures.map { LineEntry(it.line, it.mode) }.distinct()
-        .sortedWith(compareBy({ it.mode }, { it.line.toIntOrNull() ?: Int.MAX_VALUE }, { it.line }))
 
 @Composable
 private fun DirectionFilterDialog(

@@ -2,7 +2,9 @@ package se.mybus.widget
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.appwidget.AppWidgetManager
 import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -22,9 +24,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import org.json.JSONObject
+import se.mybus.Departure
+import se.mybus.DisruptionAlerts
 import se.mybus.Favorites
 import se.mybus.Settings
 import se.mybus.SlApi
+import se.mybus.Stop
 import se.mybus.friendlyError
 import se.mybus.stringsFor
 import java.util.concurrent.TimeUnit
@@ -45,9 +50,11 @@ object WidgetCache {
         put(context, siteId, Entry(previous?.body, previous?.fetchedAt ?: 0L, error))
     }
 
+    // An unreadable entry counts as nothing cached (the next fetch replaces it) rather than
+    // throwing inside the widget's drawing.
     fun load(context: Context, siteId: Int): Entry? {
         val json = prefs(context).getString(key(siteId), null) ?: return null
-        val o = JSONObject(json)
+        val o = runCatching { JSONObject(json) }.getOrNull() ?: return null
         return Entry(
             body = if (o.has("body")) o.getString("body") else null,
             fetchedAt = o.optLong("fetchedAt"),
@@ -78,14 +85,32 @@ suspend fun redrawWidgets(context: Context) {
     }
 }
 
-// Redraws every widget from the cache without fetching. Returns false if no widget is placed.
+// Redraws every widget (both kinds) from the cache without fetching. Returns false if none is placed.
 suspend fun redrawFromCache(context: Context): Boolean {
-    val ids = GlanceAppWidgetManager(context).getGlanceIds(DeparturesWidget::class.java)
-    for (id in ids) {
-        updateAppWidgetState(context, id) { it[CacheVersionKey] = System.currentTimeMillis() }
-        DeparturesWidget().update(context, id)
+    val manager = GlanceAppWidgetManager(context)
+    var any = false
+    for (widget in listOf(DeparturesWidget(), SingleStopWidget())) {
+        for (id in manager.getGlanceIds(widget.javaClass)) {
+            any = true
+            updateAppWidgetState(context, id) { it[CacheVersionKey] = System.currentTimeMillis() }
+            widget.update(context, id)
+        }
     }
-    return ids.isNotEmpty()
+    return any
+}
+
+fun anyWidgetPlaced(context: Context): Boolean {
+    val manager = AppWidgetManager.getInstance(context) ?: return false
+    return listOf(DeparturesWidgetReceiver::class.java, SingleStopWidgetReceiver::class.java).any {
+        manager.getAppWidgetIds(ComponentName(context, it)).isNotEmpty()
+    }
+}
+
+// After the last widget of a kind is removed: the minute redraws are only for widgets, but the
+// 15-minute fetch also feeds disruption alerts, so it keeps running while those are on.
+fun stopIfUnused(context: Context) {
+    if (!anyWidgetPlaced(context)) MinuteRedraw.stop(context)
+    WidgetUpdates.sync(context)
 }
 
 // Redraws the widget once a minute so departures drop off as they leave, without asking SL more
@@ -132,20 +157,26 @@ class MinuteRedrawReceiver : BroadcastReceiver() {
 // Fetching happens here rather than in the widget itself: WorkManager only runs this once the
 // app actually has network. A widget update runs in the background, where Android often blocks
 // the app's network, so fetching there failed with "no internet" while the phone was online.
+// It also checks for new disruptions when alerts are on, from the same answers, so turning
+// alerts on doesn't double the requests to SL.
 class WidgetUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val s = stringsFor(Settings.loadLanguage(applicationContext))
         var failed = false
+        val fetched = mutableMapOf<Stop, List<Departure>>()
         // One stop at a time: SL rejects simultaneous requests with HTTP 429.
         for (stop in Favorites.load(applicationContext)) {
             try {
-                WidgetCache.saveBody(applicationContext, stop.siteId, SlApi.departuresJson(stop))
+                val body = SlApi.departuresJson(stop)
+                WidgetCache.saveBody(applicationContext, stop.siteId, body)
+                fetched[stop] = SlApi.parseDepartures(body)
             } catch (e: Exception) {
                 failed = true
                 WidgetCache.saveError(applicationContext, stop.siteId, friendlyError(e, s))
             }
         }
         redrawWidgets(applicationContext)
+        DisruptionAlerts.check(applicationContext, fetched)
         // Try again shortly rather than waiting for the next 15-minute round.
         return if (failed && runAttemptCount < 3) Result.retry() else Result.success()
     }
@@ -179,5 +210,10 @@ object WidgetUpdates {
             cancelUniqueWork(PERIODIC)
             cancelUniqueWork(NOW)
         }
+    }
+
+    // Runs the 15-minute fetch while something needs it (a widget, or disruption alerts).
+    fun sync(context: Context) {
+        if (anyWidgetPlaced(context) || Settings.loadAlerts(context)) schedule(context) else cancel(context)
     }
 }

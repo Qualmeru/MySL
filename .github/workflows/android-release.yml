@@ -53,8 +53,17 @@ jobs:
           keyPassword=$KEYSTORE_PASSWORD
           EOF
 
+      # Never publish a version whose tests fail.
+      - name: Unit tests
+        run: ./gradlew --no-daemon testStandardDebugUnitTest testPresetDebugUnitTest
+
       - name: Build release APKs
         run: ./gradlew --no-daemon assembleStandardRelease assemblePresetRelease
+
+      - name: Check R8 kept the app's entry points
+        run: |
+          bash scripts/check-release-dex.sh app/build/outputs/apk/standard/release/*.apk
+          bash scripts/check-release-dex.sh app/build/outputs/apk/preset/release/*.apk
 
       - name: Prepare artifacts
         run: |

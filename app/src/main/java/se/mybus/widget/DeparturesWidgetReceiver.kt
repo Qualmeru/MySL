@@ -17,10 +17,10 @@ class DeparturesWidgetReceiver : GlanceAppWidgetReceiver() {
         MinuteRedraw.start(context)
     }
 
-    // The last widget was removed.
+    // The last widget of this kind was removed; a one-stop widget or disruption alerts may still
+    // need the background work.
     override fun onDisabled(context: Context) {
         super.onDisabled(context)
-        WidgetUpdates.cancel(context)
-        MinuteRedraw.stop(context)
+        stopIfUnused(context)
     }
 }

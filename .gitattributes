@@ -1,3 +1,4 @@
 # gradlew runs on Linux (GitHub Actions) and needs Unix line endings; the .bat needs Windows ones.
 gradlew text eol=lf
+*.sh text eol=lf
 *.bat text eol=crlf

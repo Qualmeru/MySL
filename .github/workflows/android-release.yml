@@ -95,15 +95,18 @@ jobs:
           name: android-release-apks
           path: dist
 
-      # There's no checkout in this job, so tell gh which repository to use.
+      # Just the release notes (release-notes/<tag>.md) and the script that publishes them.
+      - name: Check out release notes
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            release-notes
+            scripts
+          path: src
+
+      # The checkout is in src/, so tell gh which repository to use.
       - name: Create or update GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
-        run: |
-          if gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1; then
-            # Made in GitHub's web form: keep its title and notes, just attach the files.
-            gh release upload "$GITHUB_REF_NAME" dist/* --clobber
-          else
-            gh release create "$GITHUB_REF_NAME" dist/* --generate-notes --verify-tag
-          fi
+        run: bash src/scripts/publish-release.sh "$GITHUB_REF_NAME" "src/release-notes/$GITHUB_REF_NAME.md" dist

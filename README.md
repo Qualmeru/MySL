@@ -69,7 +69,7 @@ Use forward slashes in `storeFile`. With that file present, both debug and relea
 
 ### Automatic release builds
 
-[`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) builds both APKs on GitHub whenever a tag like `1.0.2` or `v1.0.2` is pushed, or a release is published with a new tag. It attaches `MySL.apk`, `MySL-preset.apk` and `SHA256SUMS.txt` to the release. If you wrote the release in GitHub's form, its title and notes are kept. It can also be run by hand from the Actions tab.
+[`.github/workflows/android-release.yml`](.github/workflows/android-release.yml) builds both APKs on GitHub whenever a tag like `1.0.2` or `v1.0.2` is pushed, or a release is published with a new tag. It attaches `MySL.apk`, `MySL-preset.apk` and `SHA256SUMS.txt` to the release. Write the notes before tagging, in [`release-notes/<version>.md`](release-notes) (first line `# Title`, then the notes); the release gets them. If you wrote the release in GitHub's form instead, its title and notes are kept. It can also be run by hand from the Actions tab.
 
 It signs with the same release key, taken from two repository secrets (**Settings → Secrets and variables → Actions → New repository secret**):
 

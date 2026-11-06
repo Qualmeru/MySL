@@ -19,6 +19,8 @@ Tick them off or delete them as they're done.
 - [ ] **Update check:** tell the user when a newer release is on GitHub (one request to the releases API at most once a day), since sideloaded apps don't update by themselves.
 - [ ] **Search by line** ("where does the 179 stop near me"). SL's Transport API has no line-to-stops lookup; it would need Trafiklab's GTFS data or another API.
 - [ ] **Share favourites as a QR code** as well as text, for passing them to a phone next to you.
+- [ ] **Own app icon.** The manifest still uses Android's generic `ic_menu_directions`. An adaptive icon (SL-style, "MySL") with a monochrome layer for themed icons would make it easy to find, in the launcher and the widget picker.
+- [ ] **"Leave now" reminder.** Tap a departure to get a notification a few minutes before you need to leave, updated if SL's expected time changes. The disruption alerts don't cover this: they're about notices, not a chosen departure.
 
 ## Accessibility
 
@@ -27,7 +29,8 @@ Tick them off or delete them as they're done.
 
 ## Size and upkeep
 
-- [ ] **Update dependencies.** Lint lists newer Compose BOM, Glance, WorkManager, Activity and Lifecycle versions, and targetSdk 35 is no longer the newest. Update one at a time and run CI after each.
+- [ ] **Update dependencies.** Lint lists newer Compose BOM, Glance, WorkManager, Activity and Lifecycle versions, and targetSdk 35 is no longer the newest. Update one at a time and run CI after each. Gradle 8.11 / AGP 8.7 also can't run on Java 25, which is why VS Code's Java extension offers "Upgrade Gradle to 9.x" when opening the project; upgrade Gradle and AGP together (Gradle 9 alone breaks AGP 8), not from that prompt.
+- [ ] **Take the version from the release tag.** `versionCode` and `versionName` are edited by hand before each release, and nothing stops tag `1.3.0` from publishing an app that still says 1.2.0. Either derive them from the tag in `android-release.yml`, or have it fail when the tag and `versionName` differ.
 - [ ] **Split `MainActivity.kt`** (departures screen, filter dialog and settings menu) into a file per screen.
 - [ ] **APK size:** about 1.9 MB now. What's left is mostly code (Compose, Glance, WorkManager) and Glance's own widget layouts. Publishing as an App Bundle (Play Store) would let each phone download only its own CPU's native library; leaving out the x86 ones would save about 20 KB.
 - [ ] **Back up the release key** (`mysl-release.jks` and `keystore.properties`) somewhere safe if that isn't done yet. Without it, no update can install over existing copies.

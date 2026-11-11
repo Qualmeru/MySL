@@ -1,0 +1,22 @@
+# Opens a pull request when a library, the Gradle wrapper or a GitHub Action has a new version.
+# CI (ci.yml) builds and tests every pull request, so a green one is usually safe to merge.
+# Related updates come together, so a week brings a few pull requests rather than many.
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      androidx:
+        patterns: ["androidx.*"]
+      # The Kotlin compiler (kotlin-gradle-plugin) and the Compose compiler plugin must be the same
+      # version, so they always move together.
+      kotlin:
+        patterns: ["org.jetbrains.kotlin*", "org.jetbrains.kotlinx*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly

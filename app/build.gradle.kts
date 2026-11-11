@@ -2,7 +2,6 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
@@ -15,7 +14,7 @@ val keystoreProps = Properties().apply {
 
 android {
     namespace = "se.mybus"
-    compileSdk = 35
+    compileSdk = 37
 
     signingConfigs {
         if (!keystoreProps.isEmpty) {
@@ -49,12 +48,17 @@ android {
     defaultConfig {
         applicationId = "se.mybus"
         minSdk = 26
-        targetSdk = 35
+        // Android 16. Its changes that matter here (edge-to-edge always on, predictive back, rotation
+        // on big screens) the app already handles. Check Android 17's before going to 37.
+        targetSdk = 36
         versionCode = 5
         versionName = "1.3.0"
-        // The app only speaks Swedish and English; this drops the libraries' texts in ~80 other
-        // languages (Compose, Material...) that would never be shown next to ours anyway.
-        resourceConfigurations += listOf("en", "sv")
+    }
+
+    // The app only speaks Swedish and English; this drops the libraries' texts in ~80 other
+    // languages (Compose, Material...) that would never be shown next to ours anyway.
+    androidResources {
+        localeFilters += listOf("en", "sv")
     }
 
     packaging {
@@ -64,12 +68,10 @@ android {
         }
     }
 
+    // Kotlin compiles for the same JVM version (AGP 9's built-in Kotlin follows targetCompatibility).
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
@@ -91,15 +93,15 @@ android {
 }
 
 dependencies {
-    implementation(platform("androidx.compose:compose-bom:2024.12.01"))
+    implementation(platform("androidx.compose:compose-bom:2026.09.00"))
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.compose.ui:ui")
-    implementation("androidx.activity:activity-compose:1.9.3")
-    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    implementation("androidx.glance:glance-appwidget:1.1.1")
-    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    implementation("androidx.activity:activity-compose:1.13.0")
+    implementation("androidx.lifecycle:lifecycle-runtime-compose:2.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
+    implementation("androidx.glance:glance-appwidget:1.2.0")
+    implementation("androidx.work:work-runtime-ktx:2.12.0")
 
     testImplementation("junit:junit:4.13.2")
     // android.jar's org.json is a stub that throws in JVM unit tests; this is the real thing.

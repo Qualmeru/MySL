@@ -14,7 +14,7 @@ if (-not (Test-Path keystore.properties)) {
     throw "keystore.properties is missing, so the APKs can't be signed with the release key. See README, 'Signing'."
 }
 .\gradlew.bat assembleStandardRelease assemblePresetRelease --no-daemon --max-workers=1 `
-    "-Dorg.gradle.jvmargs=-Xmx900m -XX:MaxMetaspaceSize=512m -XX:ReservedCodeCacheSize=96m -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 -XX:+UseSerialGC -Dfile.encoding=UTF-8" `
+    "-Dorg.gradle.jvmargs=-Xmx1200m -XX:MaxMetaspaceSize=640m -XX:ReservedCodeCacheSize=96m -XX:TieredStopAtLevel=1 -XX:CICompilerCount=1 -XX:+UseSerialGC -Dfile.encoding=UTF-8" `
     "-Pkotlin.compiler.execution.strategy=in-process"
 if ($LASTEXITCODE -ne 0) { throw "Gradle build failed" }
 New-Item -ItemType Directory -Force build | Out-Null

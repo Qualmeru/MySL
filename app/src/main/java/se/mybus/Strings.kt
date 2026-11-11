@@ -82,6 +82,18 @@ abstract class Strings {
 
     // SL sends "Nu" for departures leaving now; "3 min" and "21:22" read the same in both languages.
     fun display(slDisplay: String) = if (slDisplay == "Nu") now else slDisplay
+
+    // A departure as one sentence for screen readers (TalkBack), instead of badge, destination and
+    // times read as separate pieces: "Bus 178 towards Jakobsberg, 7 min, 15:34, Stand A".
+    // time is what the row shows in bold; the clock time follows unless that's what time already is.
+    fun describe(d: Departure, time: String): String = listOfNotNull(
+        listOfNotNull(modeName(d.mode).takeIf { d.mode != Mode.OTHER }, d.line, towards(d.destination)).joinToString(" "),
+        time,
+        d.expected.takeIf { it != time },
+        platform(d.platform, d.mode).takeIf { d.platform.isNotBlank() },
+        cancelled.takeIf { d.cancelled },
+        d.deviation,
+    ).joinToString(", ")
 }
 
 object Swedish : Strings() {

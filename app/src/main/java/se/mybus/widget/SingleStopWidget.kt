@@ -45,14 +45,18 @@ class SingleStopWidget : GlanceAppWidget() {
             val s = stringsFor(Settings.loadLanguage(ctx))
             val siteId = SingleStopWidgets.siteFor(ctx, appWidgetId)
             val stop = Favorites.load(ctx).firstOrNull { it.siteId == siteId }
+            val theme = Settings.loadTheme(ctx)
             if (stop == null) {
                 // Drawn for a moment while the stop is being picked, or the stop was removed from
                 // favourites since.
                 val text = if (siteId == null) s.pickStopTitle else s.stopRemoved
-                WidgetContent(s, s.title, emptyList(), lastFetch = null, showStopNames = false, emptyText = text)
+                WidgetContent(s, s.title, emptyList(), lastFetch = null, showStopNames = false, emptyText = text, theme = theme)
             } else {
                 val views = loadViews(ctx, listOf(stop))
-                WidgetContent(s, stop.name, views, lastFetchOf(ctx, listOf(stop)), showStopNames = false, maxPerStop = 8)
+                WidgetContent(
+                    s, stop.name, views, lastFetchOf(ctx, listOf(stop)),
+                    showStopNames = false, maxPerStop = 8, theme = theme,
+                )
             }
         }
     }

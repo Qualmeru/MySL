@@ -18,12 +18,12 @@ Cheap, or something that can't be undone if it goes wrong.
 
 Noticeable improvements or small bugs, a few hours each.
 
-- [ ] *(Feature)* **Widget follows the app's theme setting.** It follows the phone's light/dark mode even if the app is set to always light or dark.
-- [ ] *(Reliability)* **Keep departures across screen rotation.** They live in `remember` in `App()`, so rotating the phone empties them and shows "Loading…" until the next fetch. A `ViewModel` would keep them.
-- [ ] *(Feature)* **Own app icon.** The manifest still uses Android's generic `ic_menu_directions`. An adaptive icon (SL-style, "MySL") with a monochrome layer for themed icons would make it easy to find, in the launcher and the widget picker.
+- [x] *(Feature)* **Widget follows the app's theme setting.** It follows the phone's light/dark mode even if the app is set to always light or dark. Done: `WidgetStyles`; the widgets also redraw when the theme or language changes in the app.
+- [x] *(Reliability)* **Keep departures across screen rotation.** They live in `remember` in `App()`, so rotating the phone empties them and shows "Loading…" until the next fetch. A `ViewModel` would keep them. Done more simply: `MainActivity` handles rotation and resizing itself (`android:configChanges`), so nothing is recreated.
+- [x] *(Feature)* **Own app icon.** The manifest still uses Android's generic `ic_menu_directions`. An adaptive icon (SL-style, "MySL") with a monochrome layer for themed icons would make it easy to find, in the launcher and the widget picker. Done: a white bus front on SL blue, with a themed-icon layer.
 - [ ] *(Feature)* **Alerts that fit the day:** quiet hours or only on weekday commute times, alerts per stop, and skipping SL's minor information messages (they come with an `importance_level`).
 - [ ] *(Feature)* **One-stop widget for any stop**, not only favourites, and a "choose again" tap when its stop has been removed (today it says to remove and re-add the widget).
-- [ ] *(Accessibility)* **TalkBack:** line badges and rows should read as one sentence, e.g. "Bus 178 to Jakobsberg in 7 minutes, stand A", rather than separate fragments.
+- [x] *(Accessibility)* **TalkBack:** line badges and rows should read as one sentence, e.g. "Bus 178 to Jakobsberg in 7 minutes, stand A", rather than separate fragments. Done: `Strings.describe`, used by the app's rows and the widgets'.
 - [ ] *(Accessibility)* Check text sizes and contrast with the phone's largest font setting, in the app and the widgets.
 - [ ] *(Upkeep)* **Update dependencies.** Lint lists newer Compose BOM, Glance, WorkManager, Activity and Lifecycle versions, and targetSdk 35 is no longer the newest. Update one at a time and run CI after each. Gradle 8.11 / AGP 8.7 also can't run on Java 25, which is why VS Code's Java extension offers "Upgrade Gradle to 9.x" when opening the project; upgrade Gradle and AGP together (Gradle 9 alone breaks AGP 8), not from that prompt.
 

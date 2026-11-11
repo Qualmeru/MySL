@@ -15,10 +15,15 @@
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:fullBackupContent="@xml/backup_rules"
         android:label="@string/app_name"
-        android:icon="@android:drawable/ic_menu_directions"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@android:style/Theme.Material.NoActionBar">
+        <!-- Rotating, resizing (split screen, foldables) or a keyboard appearing would otherwise
+             recreate the activity, emptying the loaded departures and restarting the refresh
+             loop. Compose lays itself out again for the new size without that. -->
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

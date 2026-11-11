@@ -46,6 +46,27 @@ class StringsTest {
     }
 
     @Test
+    fun `screen readers get one sentence per departure`() {
+        val bus = departure(line = "178", destination = "Jakobsberg", platform = "A")
+            .copy(expected = "15:34")
+        assertEquals("Bus 178 towards Jakobsberg, 7 min, 15:34, Stand A", English.describe(bus, "7 min"))
+        assertEquals("Buss 178 mot Jakobsberg, 7 min, 15:34, Läge A", Swedish.describe(bus, "7 min"))
+    }
+
+    @Test
+    fun `the sentence includes cancellations and disruptions, without repeating the time`() {
+        val train = departure(line = "41", mode = Mode.TRAIN, destination = "Södertälje", platform = "3",
+            cancelled = true, deviation = "Signal fault").copy(expected = "15:34")
+        assertEquals(
+            "Commuter train 41 towards Södertälje, 15:34, Track 3, Cancelled, Signal fault",
+            English.describe(train, "15:34"),
+        )
+        // No mode name for "other", and no platform when SL gives none.
+        val odd = departure(line = "X", mode = Mode.OTHER, destination = "Somewhere", platform = "").copy(expected = "15:00")
+        assertEquals("X towards Somewhere, Now, 15:00", English.describe(odd, "Now"))
+    }
+
+    @Test
     fun `distances`() {
         assertEquals("350 m", English.metresAway(350))
         assertEquals("1.2 km", English.metresAway(1234))

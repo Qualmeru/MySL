@@ -37,17 +37,21 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import se.mybus.widget.WidgetCache
 import se.mybus.widget.WidgetUpdates
+import se.mybus.widget.redrawFromCache
 import se.mybus.widget.redrawWidgets
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -63,6 +67,11 @@ sealed interface StopState {
 }
 
 class MainActivity : ComponentActivity() {
+    // The widgets use the app's theme and language; draw them again after either changes.
+    private fun redrawWidgetsSoon() {
+        lifecycleScope.launch { redrawFromCache(this@MainActivity) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // Settings restored from a backup (new phone, reinstall) can have alerts on without the
@@ -111,9 +120,9 @@ class MainActivity : ComponentActivity() {
                                 favorites = favorites,
                                 onImport = onImport,
                                 themeMode = themeMode,
-                                onThemeMode = { themeMode = it; Settings.saveTheme(this, it) },
+                                onThemeMode = { themeMode = it; Settings.saveTheme(this, it); redrawWidgetsSoon() },
                                 language = language,
-                                onLanguage = { language = it; Settings.saveLanguage(this, it) },
+                                onLanguage = { language = it; Settings.saveLanguage(this, it); redrawWidgetsSoon() },
                                 alerts = alerts,
                                 onAlerts = { on ->
                                     if (on && !DisruptionAlerts.canNotify(this)) {
@@ -688,7 +697,11 @@ private fun DepartureRow(d: Departure) {
     val s = LocalStrings.current
     Row(
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            // TalkBack reads the row as one sentence instead of each piece of text on its own.
+            .clearAndSetSemantics { contentDescription = s.describe(d, s.display(d.display)) }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Box(
             contentAlignment = Alignment.Center,

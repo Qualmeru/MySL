@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The front of a bus, in white. The windscreen, destination sign and headlights are holes
+     (evenOdd), not painted on, so this one drawing also works as the monochrome themed icon.
+     Adaptive icons are 108dp with the middle 66dp always visible; the bus fits inside that. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Body with the destination sign, windscreen and two headlights cut out. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M42,29 h24 a6,6 0 0 1 6,6 v32 a6,6 0 0 1 -6,6 h-24 a6,6 0 0 1 -6,-6 v-32 a6,6 0 0 1 6,-6 z
+            M44,32.5 h20 a1.5,1.5 0 0 1 1.5,1.5 v2 a1.5,1.5 0 0 1 -1.5,1.5 h-20 a1.5,1.5 0 0 1 -1.5,-1.5 v-2 a1.5,1.5 0 0 1 1.5,-1.5 z
+            M43,41 h22 a3,3 0 0 1 3,3 v11 a3,3 0 0 1 -3,3 h-22 a3,3 0 0 1 -3,-3 v-11 a3,3 0 0 1 3,-3 z
+            M40.5,65 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 z
+            M61.5,65 a3,3 0 1 0 6,0 a3,3 0 1 0 -6,0 z" />
+
+    <!-- Wheels under the body. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M42.5,73 h7 v4 a2,2 0 0 1 -2,2 h-3 a2,2 0 0 1 -2,-2 z
+            M58.5,73 h7 v4 a2,2 0 0 1 -2,2 h-3 a2,2 0 0 1 -2,-2 z" />
+
+    <!-- Side mirrors. -->
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M32,40 h3 v8 h-3 a1.5,1.5 0 0 1 -1.5,-1.5 v-5 a1.5,1.5 0 0 1 1.5,-1.5 z
+            M73,40 h3 a1.5,1.5 0 0 1 1.5,1.5 v5 a1.5,1.5 0 0 1 -1.5,1.5 h-3 z" />
+</vector>

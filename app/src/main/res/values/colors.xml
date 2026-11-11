@@ -1,0 +1,4 @@
+<resources>
+    <!-- SL blue, the same as the app's blue bus badges. -->
+    <color name="ic_launcher_background">#0089CA</color>
+</resources>

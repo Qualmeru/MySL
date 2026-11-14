@@ -10,8 +10,8 @@ It uses SL's open [Transport API](https://www.trafiklab.se/api/our-apis/sl/trans
 - **Live times:** the next 10 departures per stop, with line, destination, time left, clock time and platform/track. Cancellations and disruptions are highlighted.
 - **Auto refresh:** updates every minute while the app is open. Pull down or tap ⟳ to refresh right away.
 - **Direction and line filters:** each side of the street or each platform is a separate direction, and each line can be hidden too. Untick what you don't need in the stop's ⋮ → Choose directions, e.g. only trains towards the city, or no 553H. The stop's header says how many directions, lines and departures are hidden.
-- **Home-screen widgets:** *All favourite stops* scrolls through every favourite; *One stop* shows a single stop you pick and fits a 2×2 spot. Both follow the stops' filters, refresh every 15 minutes (or on ↻), and drop departures as they leave.
-- **Disruption alerts:** optional (⋮ menu → Disruption alerts). A notification when one of your stops gets a new disruption or a cancelled departure on a line you haven't hidden. Checked every 15 minutes with the widget's refresh, so it adds no extra requests to SL.
+- **Home-screen widgets:** *All favourite stops* scrolls through every favourite; *One stop* shows a single stop you pick (a favourite, or any stop found by search) and fits a 2×2 spot. Both follow the stops' filters, refresh every 15 minutes (or on ↻), and drop departures as they leave.
+- **Disruption alerts:** optional (⋮ menu → Disruption alerts). A notification when one of your stops gets a new disruption or a cancelled departure on a line you haven't hidden. Checked every 15 minutes with the widget's refresh, so it adds no extra requests to SL. ⋮ → **Alert times and notices** limits them to certain hours or weekdays, and leaves out SL's minor information unless asked; each stop's ⋮ menu can turn them off for that stop.
 - **Backup, no login:** favourites, filters and settings are included in Android's own backup to the phone's Google account, and come back on a reinstall or a new phone. Departures, widget setup and other caches are left out. To move them by hand (or between copies signed with different keys), ⋮ → **Share favourites** sends them as one line of text, and ⋮ → **Import favourites** on the other phone adds them.
 - **Update notice:** sideloaded apps don't update by themselves, so once a day the app asks GitHub for the latest release. If it's newer, a banner offers **Download** (the release page) or **Not now** (hidden until the next version).
 - **Kind to SL's limits:** if SL refuses with "Quota has been exceeded", the app, the widgets and the alerts all pause together, for a minute at first and longer if SL keeps refusing (up to 15 minutes), instead of each retrying on its own.
@@ -100,8 +100,8 @@ The unit tests don't cover the screens, widgets or anything that needs a real ph
 - [ ] **+** finds a stop by name, and **Stops near me** lists nearby ones.
 - [ ] A stop's ⋮ menu: Choose directions (hide one, the header count changes), move up/down, remove.
 - [ ] *All favourite stops* widget: shows the same stops and filters, ↻ refreshes, tapping a row opens the app, a cancelled departure is crossed out.
-- [ ] *One stop* widget: picking a stop works, and it fits 2×2.
-- [ ] ⋮ → Disruption alerts can be turned on (asks for notifications) and off.
+- [ ] *One stop* widget: picking a favourite and searching for another stop both work, it fits 2×2, and it keeps showing its stop after that stop is removed from favourites.
+- [ ] ⋮ → Disruption alerts can be turned on (asks for notifications) and off. Alert times and notices saves, and a stop's ⋮ → Alerts for this stop shows "alerts off" in its header.
 - [ ] ⋮ → Share favourites, then Import favourites on another phone (or after removing a stop) adds them back.
 - [ ] Theme (light, dark, system) and language (SWE, ENG) switch right away, in the app and after the widget's next redraw.
 - [ ] After publishing: on a phone with the previous version, the update banner appears (it checks at most once a day; clear the app's data or wait a day to see it sooner).

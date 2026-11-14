@@ -20,3 +20,7 @@ updates:
     directory: "/"
     schedule:
       interval: monthly
+    # All the workflow actions in one pull request rather than one each.
+    groups:
+      actions:
+        patterns: ["*"]

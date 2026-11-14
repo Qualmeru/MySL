@@ -159,17 +159,26 @@ class MinuteRedrawReceiver : BroadcastReceiver() {
 // the app's network, so fetching there failed with "no internet" while the phone was online.
 // It also checks for new disruptions when alerts are on, from the same answers, so turning
 // alerts on doesn't double the requests to SL.
+// Favourites, then any stop that only a one-stop widget shows.
+internal fun stopsToFetch(context: Context): List<Stop> {
+    val favorites = Favorites.load(context)
+    val ids = favorites.map { it.siteId }.toSet()
+    return favorites + SingleStopWidgets.allStops(context).filter { it.siteId !in ids }
+}
+
 class WidgetUpdateWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val s = stringsFor(Settings.loadLanguage(applicationContext))
         var failed = false
         val fetched = mutableMapOf<Stop, List<Departure>>()
+        val favoriteIds = Favorites.load(applicationContext).map { it.siteId }.toSet()
         // One stop at a time: SL rejects simultaneous requests with HTTP 429.
-        for (stop in Favorites.load(applicationContext)) {
+        for (stop in stopsToFetch(applicationContext)) {
             try {
                 val body = SlApi.departuresJson(stop)
                 WidgetCache.saveBody(applicationContext, stop.siteId, body)
-                fetched[stop] = SlApi.parseDepartures(body)
+                // Alerts are for favourites; a stop only a one-stop widget shows doesn't notify.
+                if (stop.siteId in favoriteIds) fetched[stop] = SlApi.parseDepartures(body)
             } catch (e: Exception) {
                 failed = true
                 WidgetCache.saveError(applicationContext, stop.siteId, friendlyError(e, s))

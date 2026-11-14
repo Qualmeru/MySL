@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- One favourite stop. Fits a 2×2 spot; updates come from WorkManager, not updatePeriodMillis. -->
+<!-- One stop (a favourite or any other). Fits a 2×2 spot; updates come from WorkManager, not
+     updatePeriodMillis. Long-press → reconfigure (Android 12+) picks another stop. -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:minWidth="110dp"
     android:minHeight="110dp"

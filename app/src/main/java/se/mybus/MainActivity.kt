@@ -21,6 +21,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MoreVert
@@ -115,6 +117,7 @@ class MainActivity : ComponentActivity() {
             MaterialTheme(colorScheme = appColorScheme(dark, LocalContext.current)) {
                 CompositionLocalProvider(LocalStrings provides strings) {
                     App(
+                        alertsOn = alerts,
                         settingsMenu = { favorites, onImport ->
                             SettingsMenu(
                                 favorites = favorites,
@@ -140,9 +143,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-// settingsMenu gets the favourites to share, and a way to add imported ones.
+// settingsMenu gets the favourites to share, and a way to add imported ones. alertsOn: whether
+// disruption alerts are on at all, so each stop's menu can offer turning them off for that stop.
 @Composable
-fun App(settingsMenu: @Composable (List<Stop>, (List<Stop>) -> Unit) -> Unit) {
+fun App(alertsOn: Boolean, settingsMenu: @Composable (List<Stop>, (List<Stop>) -> Unit) -> Unit) {
     val context = LocalContext.current
     var favorites by remember { mutableStateOf(Favorites.load(context)) }
     var searching by rememberSaveable { mutableStateOf(false) }
@@ -175,6 +179,10 @@ fun App(settingsMenu: @Composable (List<Stop>, (List<Stop>) -> Unit) -> Unit) {
             onAdd = { searching = true },
             onRemove = { stop -> setFavorites(favorites.filter { it.siteId != stop.siteId }) },
             onMove = { stop, by -> setFavorites(favorites.move(stop.siteId, by)) },
+            alertsOn = alertsOn,
+            onToggleAlerts = { stop ->
+                setFavorites(favorites.map { if (it.siteId == stop.siteId) it.copy(alerts = !it.alerts) else it })
+            },
             onSetHidden = { stop, hidden, hiddenLines ->
                 setFavorites(favorites.map {
                     if (it.siteId == stop.siteId) it.copy(hiddenStopPoints = hidden, hiddenLines = hiddenLines) else it
@@ -195,6 +203,8 @@ fun DeparturesScreen(
     onAdd: () -> Unit,
     onRemove: (Stop) -> Unit,
     onMove: (Stop, Int) -> Unit,
+    alertsOn: Boolean,
+    onToggleAlerts: (Stop) -> Unit,
     onSetHidden: (Stop, Set<Int>, Set<String>) -> Unit,
 ) {
     val s = LocalStrings.current
@@ -290,6 +300,8 @@ fun DeparturesScreen(
                             canMoveUp = index > 0,
                             canMoveDown = index < favorites.lastIndex,
                             onMove = { by -> onMove(stop, by) },
+                            alertsOn = alertsOn,
+                            onToggleAlerts = { onToggleAlerts(stop) },
                             onFilter = { filtering = stop },
                             onRemove = { confirmRemove = stop },
                         )
@@ -351,6 +363,7 @@ private fun SettingsMenu(
     val context = LocalContext.current
     var open by remember { mutableStateOf(false) }
     var importing by remember { mutableStateOf(false) }
+    var alertOptionsOpen by remember { mutableStateOf(false) }
     Box {
         IconButton(onClick = { open = true }) {
             Icon(Icons.Default.MoreVert, contentDescription = s.settings)
@@ -402,6 +415,13 @@ private fun SettingsMenu(
                 open = false
                 onAlerts(!alerts)
             }
+            if (alerts) {
+                DropdownMenuItem(
+                    text = { Text(s.alertOptions) },
+                    leadingIcon = { Spacer(Modifier.size(24.dp)) },
+                    onClick = { open = false; alertOptionsOpen = true },
+                )
+            }
             HorizontalDivider()
             if (favorites.isNotEmpty()) {
                 DropdownMenuItem(
@@ -433,6 +453,72 @@ private fun SettingsMenu(
             },
             onDismiss = { importing = false },
         )
+    }
+
+    if (alertOptionsOpen) {
+        AlertOptionsDialog(onDismiss = { alertOptionsOpen = false })
+    }
+}
+
+// When alerts may notify (hours, weekdays) and whether minor notices count. Saved straight to
+// Settings; the background check reads them each time.
+@Composable
+private fun AlertOptionsDialog(onDismiss: () -> Unit) {
+    val s = LocalStrings.current
+    val context = LocalContext.current
+    var options by remember { mutableStateOf(Settings.loadAlertOptions(context)) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(s.alertOptions) },
+        text = {
+            Column {
+                Text(s.alertHours, style = MaterialTheme.typography.bodyMedium)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HourStepper(options.fromHour, 0..23) { options = options.copy(fromHour = it) }
+                    Text("–", modifier = Modifier.padding(horizontal = 4.dp))
+                    HourStepper(options.toHour, 1..24) { options = options.copy(toHour = it) }
+                }
+                Text(
+                    if (options.allDay) s.alertAllDay else s.alertHoursHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(12.dp))
+                CheckRow(s.alertWeekdaysOnly, options.weekdaysOnly) { options = options.copy(weekdaysOnly = it) }
+                CheckRow(s.alertIncludeMinor, options.includeMinor) { options = options.copy(includeMinor = it) }
+                Text(
+                    s.alertMinorHint,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(start = 48.dp),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { Settings.saveAlertOptions(context, options); onDismiss() }) { Text(s.save) }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(s.cancel) } },
+    )
+}
+
+// "‹ 07:00 ›": steps an hour within range, wrapping round at the ends.
+@Composable
+private fun HourStepper(hour: Int, range: IntRange, onChange: (Int) -> Unit) {
+    val s = LocalStrings.current
+    fun step(by: Int) = onChange((hour - range.first + by).mod(range.count()) + range.first)
+    IconButton(onClick = { step(-1) }) { Icon(Icons.AutoMirrored.Default.KeyboardArrowLeft, contentDescription = s.earlier) }
+    Text("%02d:00".format(hour), style = MaterialTheme.typography.titleMedium)
+    IconButton(onClick = { step(1) }) { Icon(Icons.AutoMirrored.Default.KeyboardArrowRight, contentDescription = s.later) }
+}
+
+@Composable
+private fun CheckRow(text: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier.fillMaxWidth().clickable { onChange(!checked) },
+    ) {
+        Checkbox(checked = checked, onCheckedChange = null, modifier = Modifier.padding(12.dp))
+        Text(text, style = MaterialTheme.typography.bodyMedium)
     }
 }
 
@@ -505,6 +591,8 @@ private fun StopHeader(
     canMoveUp: Boolean,
     canMoveDown: Boolean,
     onMove: (Int) -> Unit,
+    alertsOn: Boolean,
+    onToggleAlerts: () -> Unit,
     onFilter: () -> Unit,
     onRemove: () -> Unit,
 ) {
@@ -520,6 +608,7 @@ private fun StopHeader(
                 s.directionsHidden(stop.hiddenStopPoints.size).takeIf { stop.hiddenStopPoints.isNotEmpty() },
                 s.linesHidden(stop.hiddenLines.size).takeIf { stop.hiddenLines.isNotEmpty() },
                 s.departuresHidden(hiddenDepartures).takeIf { hiddenDepartures > 0 },
+                s.alertsOffHere.takeIf { alertsOn && !stop.alerts },
             ).joinToString(" · ")
             if (hiddenNote.isNotEmpty()) {
                 Text(
@@ -538,6 +627,16 @@ private fun StopHeader(
                     text = { Text(s.chooseDirections) },
                     onClick = { menuOpen = false; onFilter() },
                 )
+                if (alertsOn) {
+                    CheckedMenuItem(
+                        s.alertsForThisStop,
+                        checked = stop.alerts,
+                        leading = { Icon(Icons.Default.Notifications, contentDescription = null) },
+                    ) {
+                        menuOpen = false
+                        onToggleAlerts()
+                    }
+                }
                 if (canMoveUp) {
                     DropdownMenuItem(
                         text = { Text(s.moveUp) },

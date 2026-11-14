@@ -56,6 +56,17 @@ abstract class Strings {
     abstract val updateHint: String
     abstract val download: String
     abstract val notNow: String
+    abstract val alertOptions: String
+    abstract val alertHours: String
+    abstract val alertAllDay: String
+    abstract val alertHoursHint: String
+    abstract val alertWeekdaysOnly: String
+    abstract val alertIncludeMinor: String
+    abstract val alertMinorHint: String
+    abstract val earlier: String
+    abstract val later: String
+    abstract val alertsForThisStop: String
+    abstract val alertsOffHere: String
     abstract val moveUp: String
     abstract val moveDown: String
     abstract fun linesHidden(n: Int): String
@@ -70,8 +81,8 @@ abstract class Strings {
     abstract fun disruptionTitle(stop: String): String
     abstract fun lineCancelled(line: String, destination: String, time: String): String
     abstract val pickStopTitle: String
-    abstract val pickStopEmpty: String
-    abstract val stopRemoved: String
+    abstract val searchAllStops: String
+    abstract val tapToChooseStop: String
     abstract val exportFavorites: String
     abstract val importFavorites: String
     abstract fun exportMessage(code: String): String
@@ -158,6 +169,17 @@ object Swedish : Strings() {
     override val updateHint = "Ladda ned den nya APK-filen från GitHub och öppna den. Dina favoriter finns kvar."
     override val download = "Ladda ned"
     override val notNow = "Inte nu"
+    override val alertOptions = "Tider och notiser för larm…"
+    override val alertHours = "Larma bara mellan"
+    override val alertAllDay = "00:00–24:00 betyder hela dygnet."
+    override val alertHoursHint = "Det som pågår när tiden börjar larmas då."
+    override val alertWeekdaysOnly = "Bara vardagar"
+    override val alertIncludeMinor = "Även mindre notiser"
+    override val alertMinorHint = "Allmän information som inte ändrar resan, t.ex. om halka eller enstaka förseningar."
+    override val earlier = "Tidigare"
+    override val later = "Senare"
+    override val alertsForThisStop = "Larm för den här hållplatsen"
+    override val alertsOffHere = "larm av"
     override val moveUp = "Flytta upp"
     override val moveDown = "Flytta ner"
     override fun linesHidden(n: Int) = if (n == 1) "1 linje dold" else "$n linjer dolda"
@@ -172,8 +194,8 @@ object Swedish : Strings() {
     override fun disruptionTitle(stop: String) = "Störning vid $stop"
     override fun lineCancelled(line: String, destination: String, time: String) = "$line mot $destination $time är inställd"
     override val pickStopTitle = "Välj hållplats för widgeten"
-    override val pickStopEmpty = "Lägg till en favorithållplats i appen först."
-    override val stopRemoved = "Hållplatsen finns inte längre bland dina favoriter. Ta bort widgeten och lägg till den igen."
+    override val searchAllStops = "Sök bland alla hållplatser…"
+    override val tapToChooseStop = "Tryck för att välja hållplats"
     override val exportFavorites = "Dela favoriter"
     override val importFavorites = "Importera favoriter"
     override fun exportMessage(code: String) =
@@ -246,6 +268,17 @@ object English : Strings() {
     override val updateHint = "Download the new APK from GitHub and open it. Your favourites are kept."
     override val download = "Download"
     override val notNow = "Not now"
+    override val alertOptions = "Alert times and notices…"
+    override val alertHours = "Only alert between"
+    override val alertAllDay = "00:00–24:00 means all day."
+    override val alertHoursHint = "Whatever is still going on when it starts is alerted then."
+    override val alertWeekdaysOnly = "Weekdays only"
+    override val alertIncludeMinor = "Minor notices too"
+    override val alertMinorHint = "General information that doesn't change the trip, e.g. slippery roads or occasional delays."
+    override val earlier = "Earlier"
+    override val later = "Later"
+    override val alertsForThisStop = "Alerts for this stop"
+    override val alertsOffHere = "alerts off"
     override val moveUp = "Move up"
     override val moveDown = "Move down"
     override fun linesHidden(n: Int) = if (n == 1) "1 line hidden" else "$n lines hidden"
@@ -260,8 +293,8 @@ object English : Strings() {
     override fun disruptionTitle(stop: String) = "Disruption at $stop"
     override fun lineCancelled(line: String, destination: String, time: String) = "$line to $destination at $time is cancelled"
     override val pickStopTitle = "Choose a stop for the widget"
-    override val pickStopEmpty = "Add a favourite stop in the app first."
-    override val stopRemoved = "This stop is no longer one of your favourites. Remove the widget and add it again."
+    override val searchAllStops = "Search all stops…"
+    override val tapToChooseStop = "Tap to choose a stop"
     override val exportFavorites = "Share favourites"
     override val importFavorites = "Import favourites"
     override fun exportMessage(code: String) =

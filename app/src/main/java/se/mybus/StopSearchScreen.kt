@@ -37,7 +37,7 @@ private val LocationPermissions = arrayOf(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun StopSearchScreen(favoriteIds: Set<Int>, onPick: (Stop) -> Unit, onBack: () -> Unit) {
+fun StopSearchScreen(favoriteIds: Set<Int>, onPick: (Stop) -> Unit, onBack: () -> Unit, title: String? = null) {
     val s = LocalStrings.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -83,7 +83,7 @@ fun StopSearchScreen(favoriteIds: Set<Int>, onPick: (Stop) -> Unit, onBack: () -
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(s.addStop) },
+                title = { Text(title ?: s.addStop) },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = s.back)

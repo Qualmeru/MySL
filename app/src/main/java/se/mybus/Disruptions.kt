@@ -9,6 +9,27 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import org.json.JSONObject
+import java.time.DayOfWeek
+import java.time.LocalDateTime
+
+// When alerts may notify, and which notices count. fromHour..toHour is the daily window (0..24 =
+// all day; 22..6 crosses midnight); outside it, or at the weekend with weekdaysOnly, nothing is
+// announced and nothing is marked as seen, so what's still going on is announced once it opens.
+data class AlertOptions(
+    val fromHour: Int = 0,
+    val toHour: Int = 24,
+    val weekdaysOnly: Boolean = false,
+    val includeMinor: Boolean = false,
+) {
+    val allDay: Boolean get() = (toHour - fromHour) % 24 == 0
+
+    fun allows(time: LocalDateTime): Boolean {
+        if (weekdaysOnly && time.dayOfWeek in setOf(DayOfWeek.SATURDAY, DayOfWeek.SUNDAY)) return false
+        if (allDay) return true
+        val h = time.hour
+        return if (fromHour < toHour) h in fromHour until toHour else h >= fromHour || h < toHour
+    }
+}
 
 // Something worth a notification at one stop: SL's disruption text, or a cancelled departure.
 // key identifies it across fetches, so the same notice is only announced once.
@@ -16,9 +37,14 @@ data class Notice(val key: String, val text: String)
 
 // Notices among the departures this stop shows (its filters apply: a hidden line shouldn't ping).
 // SL repeats a disruption message on every affected departure, so each message counts once.
-internal fun noticesFor(stop: Stop, departures: List<Departure>, s: Strings): List<Notice> {
+// SL's own "Inställd" notice is left out (the cancellation notice below says more), and so is
+// general information unless includeMinor.
+internal fun noticesFor(stop: Stop, departures: List<Departure>, s: Strings, includeMinor: Boolean = false): List<Notice> {
+    if (!stop.alerts) return emptyList()
     val shown = stop.visible(departures)
-    val messages = shown.mapNotNull { it.deviation }.distinct()
+    val messages = shown.flatMap { it.deviations }
+        .filter { !it.isCancellation && (includeMinor || !it.isMinor) }
+        .map { it.message }.distinct()
         .map { Notice("${stop.siteId}|dev|$it", it) }
     val cancellations = shown.filter { it.cancelled }.map {
         Notice(
@@ -53,11 +79,13 @@ object DisruptionAlerts {
     // so a failed fetch neither announces nor forgets anything).
     fun check(context: Context, fetched: Map<Stop, List<Departure>>) {
         if (!Settings.loadAlerts(context)) return
+        val options = Settings.loadAlertOptions(context)
+        if (!options.allows(LocalDateTime.now())) return
         val s = stringsFor(Settings.loadLanguage(context))
         val now = System.currentTimeMillis()
         var seen = loadSeen(context)
         for ((stop, departures) in fetched) {
-            val (fresh, updated) = newNotices(noticesFor(stop, departures, s), seen, now)
+            val (fresh, updated) = newNotices(noticesFor(stop, departures, s, options.includeMinor), seen, now)
             seen = updated
             if (fresh.isNotEmpty()) notify(context, s, stop, fresh)
         }

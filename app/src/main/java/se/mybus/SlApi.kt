@@ -12,11 +12,13 @@ import java.time.LocalDateTime
 
 // hiddenStopPoints: stop points (one per street side / platform, i.e. direction) the user filtered out.
 // hiddenLines: line designations (e.g. "179") the user filtered out at this stop.
+// alerts: whether this stop's disruptions notify (when disruption alerts are on at all).
 data class Stop(
     val siteId: Int,
     val name: String,
     val hiddenStopPoints: Set<Int> = emptySet(),
     val hiddenLines: Set<String> = emptySet(),
+    val alerts: Boolean = true,
 )
 
 // A stop from SL's full site list; note is the area or street that tells same-named stops apart.
@@ -27,6 +29,16 @@ data class Site(val id: Int, val name: String, val note: String, val lat: Double
 // requests reach it from the same network. quota tells that case apart so it can say "try later".
 // retryAfterMs is SL's own Retry-After, when it sent one.
 class SlApiException(message: String, val quota: Boolean, val retryAfterMs: Long? = null) : Exception(message)
+
+// One of SL's notices on a departure. importance is SL's importance_level (5 for general
+// information such as "occasional delays because of slippery roads", 7 for things like a moved
+// stop); consequence is e.g. "INFORMATION" or "CANCELLED".
+data class Deviation(val message: String, val importance: Int, val consequence: String) {
+    // SL marks a cancelled departure with a bare "Inställd" notice too; the app says that itself.
+    val isCancellation: Boolean get() = consequence == "CANCELLED"
+    // General information that doesn't change the trip; only alerted if minor notices are on.
+    val isMinor: Boolean get() = consequence == "INFORMATION" && importance <= 5
+}
 
 // SL's transport_mode values.
 enum class Mode { BUS, TRAIN, METRO, TRAM, SHIP, OTHER }
@@ -44,7 +56,10 @@ data class Departure(
     val platform: String,
     val stopPointId: Int,
     val cancelled: Boolean,
+    // The notice shown under the destination (the first one that isn't SL's bare "Inställd").
     val deviation: String?,
+    // All of SL's notices, for deciding which are worth an alert.
+    val deviations: List<Deviation> = emptyList(),
 )
 
 // SL Transport API (Trafiklab), open and keyless:
@@ -152,7 +167,12 @@ object SlApi {
         val arr = JSONObject(body).optJSONArray("departures") ?: return emptyList()
         return (0 until arr.length()).map { i ->
             val d = arr.getJSONObject(i)
-            val deviations = d.optJSONArray("deviations")
+            val deviationsJson = d.optJSONArray("deviations")
+            val deviations = (0 until (deviationsJson?.length() ?: 0)).mapNotNull { j ->
+                val o = deviationsJson!!.getJSONObject(j)
+                val message = o.optString("message").ifBlank { return@mapNotNull null }
+                Deviation(message, o.optInt("importance_level", 0), o.optString("consequence"))
+            }
             val line = d.getJSONObject("line")
             val time = d.optString("expected", d.optString("scheduled"))
             Departure(
@@ -174,8 +194,8 @@ object SlApi {
                 platform = d.optJSONObject("stop_point")?.optString("designation").orEmpty(),
                 stopPointId = d.optJSONObject("stop_point")?.optInt("id") ?: 0,
                 cancelled = d.optString("state") == "CANCELLED",
-                deviation = if (deviations != null && deviations.length() > 0)
-                    deviations.getJSONObject(0).optString("message").ifBlank { null } else null,
+                deviation = deviations.firstOrNull { !it.isCancellation }?.message,
+                deviations = deviations,
             )
         }
     }

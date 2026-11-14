@@ -6,7 +6,7 @@ import org.json.JSONObject
 import java.util.Base64
 
 // Favourite stops, kept in SharedPreferences as a JSON array of
-// {id, name, hidden: [stop point ids], hiddenLines: [line designations]}, in the order shown.
+// {id, name, hidden: [stop point ids], hiddenLines: [line designations], alerts}, in the order shown.
 object Favorites {
     private const val PREFS = "favorites"
     private const val KEY = "stops"
@@ -40,12 +40,13 @@ object Favorites {
                     .put("name", it.name)
                     .put("hidden", JSONArray(it.hiddenStopPoints.toList()))
                     .put("hiddenLines", JSONArray(it.hiddenLines.toList()))
+                    .put("alerts", it.alerts)
             )
         }
         return arr.toString()
     }
 
-    // Older saves have no "hiddenLines", and the first version had no "hidden" either.
+    // Older saves have no "alerts" (on) or "hiddenLines", and the first version had no "hidden" either.
     internal fun decode(json: String): List<Stop> {
         val arr = JSONArray(json)
         return (0 until arr.length()).map { i ->
@@ -57,6 +58,7 @@ object Favorites {
                 o.getString("name"),
                 if (hidden == null) emptySet() else (0 until hidden.length()).map { hidden.getInt(it) }.toSet(),
                 if (hiddenLines == null) emptySet() else (0 until hiddenLines.length()).map { hiddenLines.getString(it) }.toSet(),
+                alerts = o.optBoolean("alerts", true),
             )
         }.distinctBy { it.siteId }
     }

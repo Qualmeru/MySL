@@ -1,6 +1,7 @@
 package se.mybus
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.time.LocalDateTime
@@ -67,5 +68,66 @@ class DisruptionsTest {
     fun `duplicate keys in one batch are announced once`() {
         val (fresh, _) = newNotices(listOf(Notice("a", "A"), Notice("a", "A")), emptyMap(), now = 0)
         assertEquals(1, fresh.size)
+    }
+
+    @Test
+    fun `minor information is skipped unless asked for`() {
+        val deps = listOf(
+            departure(deviation = "Enstaka förseningar pga halka", importance = 5, consequence = "INFORMATION"),
+            departure(deviation = "Läge C är flyttat", importance = 7, consequence = "INFORMATION"),
+        )
+        assertEquals(listOf("Läge C är flyttat"), noticesFor(stop, deps, English).map { it.text })
+        assertEquals(2, noticesFor(stop, deps, English, includeMinor = true).size)
+    }
+
+    @Test
+    fun `SL's own Inställd notice isn't announced next to the cancellation`() {
+        val at = LocalDateTime.of(2026, 11, 5, 15, 34)
+        val deps = listOf(
+            departure(line = "178", destination = "Mörby", cancelled = true, expectedAt = at, deviation = "Inställd", consequence = "CANCELLED"),
+        )
+        assertEquals(listOf("178 to Mörby at 15:34 is cancelled"), noticesFor(stop, deps, English).map { it.text })
+    }
+
+    @Test
+    fun `a stop with alerts turned off never notifies`() {
+        val quiet = stop.copy(alerts = false)
+        val deps = listOf(departure(deviation = "Train trouble"), departure(cancelled = true))
+        assertTrue(noticesFor(quiet, deps, English).isEmpty())
+    }
+
+    // 2026-11-09 is a Monday, 2026-11-14 a Saturday.
+    private fun at(day: Int, hour: Int) = LocalDateTime.of(2026, 11, day, hour, 30)
+
+    @Test
+    fun `alerts are allowed all day by default`() {
+        val options = AlertOptions()
+        assertTrue(options.allDay)
+        assertTrue(options.allows(at(9, 3)))
+        assertTrue(options.allows(at(14, 23)))
+    }
+
+    @Test
+    fun `a daytime window allows only its hours`() {
+        val options = AlertOptions(fromHour = 6, toHour = 9)
+        assertFalse(options.allows(at(9, 5)))
+        assertTrue(options.allows(at(9, 6)))
+        assertTrue(options.allows(at(9, 8)))
+        assertFalse(options.allows(at(9, 9)))
+    }
+
+    @Test
+    fun `a window can cross midnight`() {
+        val options = AlertOptions(fromHour = 22, toHour = 6)
+        assertTrue(options.allows(at(9, 23)))
+        assertTrue(options.allows(at(9, 2)))
+        assertFalse(options.allows(at(9, 12)))
+    }
+
+    @Test
+    fun `weekdays only is quiet at the weekend`() {
+        val options = AlertOptions(weekdaysOnly = true)
+        assertTrue(options.allows(at(9, 12)))
+        assertFalse(options.allows(at(14, 12)))
     }
 }

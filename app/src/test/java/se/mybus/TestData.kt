@@ -11,6 +11,9 @@ internal fun departure(
     expectedAt: LocalDateTime? = LocalDateTime.of(2026, 11, 5, 15, 0),
     cancelled: Boolean = false,
     deviation: String? = null,
+    // SL's level and kind for that notice; 7 + DISRUPTION is one that's always alerted.
+    importance: Int = 7,
+    consequence: String = "DISRUPTION",
 ) = Departure(
     line = line,
     mode = mode,
@@ -23,4 +26,5 @@ internal fun departure(
     stopPointId = stopPointId,
     cancelled = cancelled,
     deviation = deviation,
+    deviations = listOfNotNull(deviation?.let { Deviation(it, importance, consequence) }),
 )

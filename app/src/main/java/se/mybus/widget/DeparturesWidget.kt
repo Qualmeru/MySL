@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
+import androidx.glance.action.Action
 import androidx.glance.action.ActionParameters
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
@@ -114,7 +115,7 @@ internal fun lastFetchOf(context: Context, stops: List<Stop>): Long? =
 
 // E.g. right after installing this version, or after adding a stop: nothing cached yet, so fetch.
 internal fun ensureFetching(context: Context) {
-    if (Favorites.load(context).any { WidgetCache.load(context, it.siteId) == null }) {
+    if (stopsToFetch(context).any { WidgetCache.load(context, it.siteId) == null }) {
         WidgetUpdates.schedule(context)
         WidgetUpdates.refreshNow(context)
         MinuteRedraw.start(context)
@@ -141,9 +142,13 @@ class DeparturesWidget : GlanceAppWidget() {
     }
 }
 
-// Tapping anywhere but ↻ opens the app. Rows inside the LazyColumn need it set on each item,
+// Tapping anywhere but ↻ opens the app, unless WidgetContent was given another action (a one-stop
+// widget without a stop opens its picker). Rows inside the LazyColumn need it set on each item,
 // because taps on list items don't reach the outer column.
-private fun openApp() = actionStartActivity<MainActivity>()
+private val LocalTap = staticCompositionLocalOf<Action?> { null }
+
+@Composable
+private fun tapAction(): Action = LocalTap.current ?: actionStartActivity<MainActivity>()
 
 @Composable
 internal fun WidgetContent(
@@ -155,9 +160,10 @@ internal fun WidgetContent(
     maxPerStop: Int = MAX_PER_STOP_WIDGET,
     emptyText: String = s.noFavorites,
     theme: ThemeMode = ThemeMode.SYSTEM,
+    tap: Action? = null,
 ) {
     val styles = WidgetStyles(theme)
-    CompositionLocalProvider(LocalWidgetStyles provides styles) {
+    CompositionLocalProvider(LocalWidgetStyles provides styles, LocalTap provides tap) {
         WidgetBody(s, title, views, lastFetch, showStopNames, maxPerStop, emptyText)
     }
 }
@@ -173,12 +179,12 @@ private fun WidgetBody(
     emptyText: String,
 ) {
     val styles = LocalWidgetStyles.current
-    Column(modifier = GlanceModifier.fillMaxSize().background(styles.background).clickable(openApp())) {
+    Column(modifier = GlanceModifier.fillMaxSize().background(styles.background).clickable(tapAction())) {
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
             verticalAlignment = Alignment.Vertical.CenterVertically,
         ) {
-            Column(modifier = GlanceModifier.defaultWeight().clickable(openApp())) {
+            Column(modifier = GlanceModifier.defaultWeight().clickable(tapAction())) {
                 Text(title, style = styles.title, maxLines = 1)
                 if (lastFetch != null) {
                     val time = Instant.ofEpochMilli(lastFetch).atZone(ZoneId.systemDefault()).format(HourMinute)
@@ -212,7 +218,7 @@ private fun WidgetBody(
                             style = LocalWidgetStyles.current.stop,
                             modifier = GlanceModifier
                                 .fillMaxWidth()
-                                .clickable(openApp())
+                                .clickable(tapAction())
                                 .padding(start = 14.dp, end = 14.dp, top = 8.dp, bottom = 4.dp),
                         )
                     }
@@ -244,7 +250,7 @@ private fun Message(text: String) {
     Text(
         text,
         style = LocalWidgetStyles.current.message,
-        modifier = GlanceModifier.fillMaxWidth().clickable(openApp()).padding(horizontal = 14.dp, vertical = 4.dp),
+        modifier = GlanceModifier.fillMaxWidth().clickable(tapAction()).padding(horizontal = 14.dp, vertical = 4.dp),
     )
 }
 
@@ -256,7 +262,7 @@ private fun DepartureRowGlance(s: Strings, d: Departure, now: LocalDateTime) {
         verticalAlignment = Alignment.Vertical.CenterVertically,
         modifier = GlanceModifier
             .fillMaxWidth()
-            .clickable(openApp())
+            .clickable(tapAction())
             // TalkBack reads the row as one sentence instead of badge, destination and time apart.
             .semantics { contentDescription = s.describe(d, left) }
             .padding(horizontal = 14.dp, vertical = 5.dp),

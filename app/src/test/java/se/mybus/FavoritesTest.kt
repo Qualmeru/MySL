@@ -19,6 +19,14 @@ class FavoritesTest {
     }
 
     @Test
+    fun `round trips a stop with its alerts turned off`() {
+        val stops = listOf(Stop(5875, "Frihetsvägen", alerts = false), Stop(9507, "Helenelunds station"))
+        val back = Favorites.decode(Favorites.encode(stops))
+        assertEquals(stops, back)
+        assertEquals(listOf(false, true), back.map { it.alerts })
+    }
+
+    @Test
     fun `round trips an empty list`() {
         assertEquals(emptyList<Stop>(), Favorites.decode(Favorites.encode(emptyList())))
     }

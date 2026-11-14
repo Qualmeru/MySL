@@ -19,7 +19,7 @@ jobs:
     steps:
       # Full history and tags, so the version check can find the previous release.
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -29,7 +29,7 @@ jobs:
         run: bash scripts/check-release-version.sh "$GITHUB_REF_NAME"
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -38,7 +38,7 @@ jobs:
       # List the packages explicitly: the default ("tools platform-tools") fails on newer
       # command-line tools, which no longer have a "tools" package.
       - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
         with:
           packages: "platform-tools platforms;android-37.0 build-tools;36.0.0"
 
@@ -82,7 +82,7 @@ jobs:
           sha256sum *.apk > SHA256SUMS.txt
 
       - name: Upload APKs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: android-release-apks
           path: dist/*
@@ -98,14 +98,14 @@ jobs:
 
     steps:
       - name: Download release files
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: android-release-apks
           path: dist
 
       # Just the release notes (release-notes/<tag>.md) and the script that publishes them.
       - name: Check out release notes
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           sparse-checkout: |
             release-notes

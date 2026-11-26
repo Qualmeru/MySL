@@ -19,6 +19,7 @@ import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.provideContent
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.background
 import androidx.glance.color.ColorProvider
 import androidx.glance.currentState
@@ -30,6 +31,7 @@ import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.fillMaxWidth
 import androidx.glance.layout.padding
+import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.semantics.contentDescription
 import androidx.glance.semantics.semantics
@@ -137,6 +139,7 @@ class DeparturesWidget : GlanceAppWidget() {
             WidgetContent(
                 s, s.title, loadViews(ctx, stops), lastFetchOf(ctx, stops),
                 showStopNames = true, theme = Settings.loadTheme(ctx),
+                refreshing = isRefreshing(currentState(RefreshStartedKey), System.currentTimeMillis()),
             )
         }
     }
@@ -161,10 +164,11 @@ internal fun WidgetContent(
     emptyText: String = s.noFavorites,
     theme: ThemeMode = ThemeMode.SYSTEM,
     tap: Action? = null,
+    refreshing: Boolean = false,
 ) {
     val styles = WidgetStyles(theme)
     CompositionLocalProvider(LocalWidgetStyles provides styles, LocalTap provides tap) {
-        WidgetBody(s, title, views, lastFetch, showStopNames, maxPerStop, emptyText)
+        WidgetBody(s, title, views, lastFetch, showStopNames, maxPerStop, emptyText, refreshing)
     }
 }
 
@@ -177,6 +181,7 @@ private fun WidgetBody(
     showStopNames: Boolean,
     maxPerStop: Int,
     emptyText: String,
+    refreshing: Boolean,
 ) {
     val styles = LocalWidgetStyles.current
     Column(modifier = GlanceModifier.fillMaxSize().background(styles.background).clickable(tapAction())) {
@@ -186,19 +191,22 @@ private fun WidgetBody(
         ) {
             Column(modifier = GlanceModifier.defaultWeight().clickable(tapAction())) {
                 Text(title, style = styles.title, maxLines = 1)
-                if (lastFetch != null) {
+                if (refreshing) {
+                    Text(s.refreshing, style = styles.updated)
+                } else if (lastFetch != null) {
                     val time = Instant.ofEpochMilli(lastFetch).atZone(ZoneId.systemDefault()).format(HourMinute)
                     Text(s.updated(time), style = styles.updated)
                 }
             }
-            Text(
-                "↻",
-                style = TextStyle(fontSize = 24.sp, color = styles.foreground),
+            Box(
+                contentAlignment = Alignment.Center,
                 modifier = GlanceModifier
+                    .size(48.dp)
                     .clickable(actionRunCallback<RefreshAction>())
-                    .semantics { contentDescription = s.refresh }
-                    .padding(8.dp),
-            )
+                    .semantics { contentDescription = s.refresh },
+            ) {
+                Text("↻", style = TextStyle(fontSize = 24.sp, color = styles.foreground))
+            }
         }
 
         var nextId = 0L
@@ -300,13 +308,15 @@ private fun DepartureRowGlance(s: Strings, d: Departure, now: LocalDateTime) {
                 left,
                 style = if (d.cancelled) styles.time.copy(color = styles.error, textDecoration = strike) else styles.time,
             )
-            Text(d.expected, style = styles.updated)
+            if (d.expected != left) Text(d.expected, style = styles.updated)
         }
     }
 }
 
 class RefreshAction : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
-        WidgetUpdates.refreshNow(context)
+        updateAppWidgetState(context, glanceId) { it[RefreshStartedKey] = System.currentTimeMillis() }
+        redrawFromCache(context)
+        WidgetUpdates.refreshNow(context, userInitiated = true)
     }
 }

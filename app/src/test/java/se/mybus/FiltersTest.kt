@@ -53,9 +53,10 @@ class FiltersTest {
     }
 
     @Test
-    fun `an hour or more away, or no time, shows the clock time`() {
-        val now = LocalDateTime.of(2026, 11, 5, 15, 0, 0)
-        assertEquals("16:05", timeLeft(departure(expectedAt = now.plusMinutes(65)), now, English))
+    fun `counts down past an hour and across midnight, or shows clock time if unknown`() {
+        val now = LocalDateTime.of(2026, 11, 5, 23, 45, 0)
+        assertEquals("60 min", timeLeft(departure(expectedAt = now.plusMinutes(60)), now, English))
+        assertEquals("65 min", timeLeft(departure(expectedAt = now.plusMinutes(65)), now, English))
         val unknown = departure(expectedAt = null).copy(expected = "15:30")
         assertEquals("15:30", timeLeft(unknown, now, English))
     }

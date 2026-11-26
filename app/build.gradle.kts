@@ -51,8 +51,8 @@ android {
         // Android 16. Its changes that matter here (edge-to-edge always on, predictive back, rotation
         // on big screens) the app already handles. Check Android 17's before going to 37.
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.4.0"
+        versionCode = 7
+        versionName = "1.4.1"
     }
 
     // The app only speaks Swedish and English; this drops the libraries' texts in ~80 other

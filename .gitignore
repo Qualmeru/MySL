@@ -3,6 +3,7 @@
 build/
 local.properties
 .idea/
+.vscode/
 *.iml
 
 # Build outputs and local files

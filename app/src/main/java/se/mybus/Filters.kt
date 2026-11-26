@@ -9,17 +9,11 @@ fun List<Departure>.notLeftBy(now: LocalDateTime): List<Departure> {
     return filter { it.expectedAt == null || !it.expectedAt.isBefore(cutoff) }
 }
 
-// "Nu" / "7 min" counted from now, for the widget. SL's own display text is only as fresh as the
-// last fetch (up to 15 minutes old there), so the widget works it out at each minute's redraw.
-// An hour or more away, or with no parsable time, it falls back to the clock time.
+// Count down from the expected time rather than SL's display text, which ages after a fetch.
 fun timeLeft(d: Departure, now: LocalDateTime, s: Strings): String {
     val at = d.expectedAt ?: return d.expected
     val minutes = java.time.Duration.between(now, at).toMinutes()
-    return when {
-        minutes <= 0 -> s.now
-        minutes < 60 -> "$minutes min"
-        else -> d.expected
-    }
+    return if (minutes <= 0) s.now else "$minutes min"
 }
 
 // The departures this stop shows, after its direction and line filters. The app and the widget

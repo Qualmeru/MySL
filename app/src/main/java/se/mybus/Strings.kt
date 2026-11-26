@@ -9,6 +9,7 @@ abstract class Strings {
     abstract val title: String
     abstract fun updated(time: String): String
     abstract val fetching: String
+    abstract val refreshing: String
     abstract val refresh: String
     abstract val addStop: String
     abstract val noFavorites: String
@@ -111,6 +112,7 @@ object Swedish : Strings() {
     override val title = "Avgångar"
     override fun updated(time: String) = "Uppdaterad $time"
     override val fetching = "Hämtar…"
+    override val refreshing = "Uppdaterar…"
     override val refresh = "Uppdatera"
     override val addStop = "Lägg till hållplats"
     override val noFavorites = "Inga favoriter än. Tryck + för att lägga till en hållplats."
@@ -210,6 +212,7 @@ object English : Strings() {
     override val title = "Departures"
     override fun updated(time: String) = "Updated $time"
     override val fetching = "Loading…"
+    override val refreshing = "Refreshing…"
     override val refresh = "Refresh"
     override val addStop = "Add stop"
     override val noFavorites = "No favourites yet. Tap + to add a stop."

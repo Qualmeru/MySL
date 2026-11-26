@@ -72,6 +72,7 @@ class SingleStopWidget : GlanceAppWidget() {
             val s = stringsFor(Settings.loadLanguage(ctx))
             val stop = SingleStopWidgets.stopFor(ctx, appWidgetId)?.let { widgetStop(ctx, it) }
             val theme = Settings.loadTheme(ctx)
+            val refreshing = isRefreshing(currentState(RefreshStartedKey), System.currentTimeMillis())
             if (stop == null) {
                 // Drawn while the stop is being picked, or for an old widget whose favourite was
                 // removed: a tap opens the picker for this widget.
@@ -82,13 +83,13 @@ class SingleStopWidget : GlanceAppWidget() {
                 )
                 WidgetContent(
                     s, s.title, emptyList(), lastFetch = null, showStopNames = false,
-                    emptyText = s.tapToChooseStop, theme = theme, tap = choose,
+                    emptyText = s.tapToChooseStop, theme = theme, tap = choose, refreshing = refreshing,
                 )
             } else {
                 val views = loadViews(ctx, listOf(stop))
                 WidgetContent(
                     s, stop.name, views, lastFetchOf(ctx, listOf(stop)),
-                    showStopNames = false, maxPerStop = 8, theme = theme,
+                    showStopNames = false, maxPerStop = 8, theme = theme, refreshing = refreshing,
                 )
             }
         }

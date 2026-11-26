@@ -55,6 +55,7 @@ import se.mybus.widget.WidgetCache
 import se.mybus.widget.WidgetUpdates
 import se.mybus.widget.redrawFromCache
 import se.mybus.widget.redrawWidgets
+import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 
@@ -210,6 +211,7 @@ fun DeparturesScreen(
     val s = LocalStrings.current
     val context = LocalContext.current
     var updatedAt by remember { mutableStateOf<String?>(null) }
+    var now by remember { mutableStateOf(LocalDateTime.now()) }
     var refreshing by remember { mutableStateOf(false) }
     var confirmRemove by remember { mutableStateOf<Stop?>(null) }
     var filtering by remember { mutableStateOf<Stop?>(null) }
@@ -240,6 +242,15 @@ fun DeparturesScreen(
         updatedAt = LocalTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
         refreshing = false
         redrawWidgets(context)
+    }
+
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) {
+            while (true) {
+                now = LocalDateTime.now()
+                delay(1_000L)
+            }
+        }
     }
 
     // Poll every minute, but only while the app is on screen.
@@ -315,7 +326,7 @@ fun DeparturesScreen(
                             when {
                                 state.departures.isEmpty() -> item { Message(s.noDepartures) }
                                 shown.isEmpty() -> item { Message(s.noDeparturesSelectedDirections) }
-                                else -> items(shown) { DepartureRow(it) }
+                                else -> items(shown) { DepartureRow(it, now) }
                             }
                         }
                     }
@@ -792,14 +803,15 @@ fun Message(text: String) {
 }
 
 @Composable
-private fun DepartureRow(d: Departure) {
+private fun DepartureRow(d: Departure, now: LocalDateTime) {
     val s = LocalStrings.current
+    val left = timeLeft(d, now, s)
     Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
             // TalkBack reads the row as one sentence instead of each piece of text on its own.
-            .clearAndSetSemantics { contentDescription = s.describe(d, s.display(d.display)) }
+            .clearAndSetSemantics { contentDescription = s.describe(d, left) }
             .padding(horizontal = 16.dp, vertical = 8.dp),
     ) {
         Box(
@@ -838,8 +850,10 @@ private fun DepartureRow(d: Departure) {
         }
         Spacer(Modifier.width(12.dp))
         Column(horizontalAlignment = Alignment.End) {
-            Text(s.display(d.display), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
-            Text(d.expected, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(left, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            if (d.expected != left) {
+                Text(d.expected, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
     }
     HorizontalDivider(Modifier.padding(horizontal = 16.dp), thickness = 0.5.dp)

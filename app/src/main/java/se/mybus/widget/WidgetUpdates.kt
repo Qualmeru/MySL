@@ -30,6 +30,7 @@ import org.json.JSONObject
 import se.mybus.Departure
 import se.mybus.DisruptionAlerts
 import se.mybus.Favorites
+import se.mybus.FilterHistory
 import se.mybus.Settings
 import se.mybus.SlApi
 import se.mybus.Stop
@@ -45,6 +46,7 @@ object WidgetCache {
     class Entry(val body: String?, val fetchedAt: Long, val error: String?)
 
     fun saveBody(context: Context, siteId: Int, body: String) {
+        FilterHistory.record(context, siteId, SlApi.parseDepartures(body), load(context, siteId)?.body)
         put(context, siteId, Entry(body, System.currentTimeMillis(), null))
     }
 

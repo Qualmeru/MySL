@@ -1,6 +1,7 @@
 package se.mybus
 
 import java.time.LocalDateTime
+import java.util.Locale
 
 // Drops cached departures that have already left, with a minute's grace so "Nu" doesn't vanish
 // the moment it's due. Ones without a parsable time are kept.
@@ -32,7 +33,7 @@ internal data class Direction(
 )
 
 internal fun directionsOf(departures: List<Departure>): List<Direction> =
-    departures.groupBy { it.stopPointId }.map { (id, deps) ->
+    sortDirections(departures.groupBy { it.stopPointId }.map { (id, deps) ->
         Direction(
             stopPointId = id,
             mode = deps.first().mode,
@@ -40,14 +41,24 @@ internal fun directionsOf(departures: List<Departure>): List<Direction> =
             destinations = deps.groupingBy { it.destination }.eachCount()
                 .entries.sortedByDescending { it.value }.map { it.key },
         )
-    }.sortedWith(compareBy({ it.mode }, { it.platform }, { it.destinations.firstOrNull() }))
+    })
+
+internal fun sortDirections(directions: Collection<Direction>): List<Direction> =
+    directions.sortedWith(compareBy({ it.mode }, { it.platform }, { it.destinations.firstOrNull() }))
 
 internal data class LineEntry(val line: String, val mode: Mode)
 
 // By number, so "4" < "41" < "178", with suffixed lines next to their number ("553" < "553H" < "553V").
 internal fun linesOf(departures: List<Departure>): List<LineEntry> =
-    departures.map { LineEntry(it.line, it.mode) }.distinct()
-        .sortedWith(compareBy({ it.mode }, { leadingNumber(it.line) }, { it.line }))
+    sortLines(departures.map { LineEntry(it.line, it.mode) }.distinct())
+
+internal fun sortLines(lines: Collection<LineEntry>): List<LineEntry> =
+    lines.sortedWith(compareBy({ it.mode }, { leadingNumber(it.line) }, { it.line }))
 
 private fun leadingNumber(line: String): Int =
     line.takeWhile { it.isDigit() }.toIntOrNull() ?: Int.MAX_VALUE
+
+private val LINE_INPUT = Regex("[\\p{L}\\p{N}-]{1,32}")
+
+internal fun normalizeLineInput(input: String): String? =
+    input.trim().uppercase(Locale.ROOT).takeIf { LINE_INPUT.matches(it) }

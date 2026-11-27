@@ -677,92 +677,117 @@ private fun DirectionFilterDialog(
     onDismiss: () -> Unit,
 ) {
     val s = LocalStrings.current
-    val directions = remember(departures) { directionsOf(departures) }
-    val lines = remember(departures) { linesOf(departures) }
-    // Only name the mode when the stop has more than one, e.g. buses and trains at a station.
-    val mixedModes = directions.map { it.mode }.distinct().size > 1
+    val context = LocalContext.current
+    val observed = remember(stop.siteId, departures) {
+        FilterHistory.load(context, stop.siteId).observe(departures)
+    }
     var hidden by remember { mutableStateOf(stop.hiddenStopPoints) }
     var hiddenLines by remember { mutableStateOf(stop.hiddenLines) }
+    var addedLines by remember { mutableStateOf(emptySet<String>()) }
+    var lineInput by remember { mutableStateOf("") }
+    val normalizedLine = normalizeLineInput(lineInput)
+    val options = observed.includingHidden(stop.copy(
+        hiddenStopPoints = stop.hiddenStopPoints + hidden,
+        hiddenLines = stop.hiddenLines + hiddenLines + addedLines,
+    ))
+    val mixedModes = (options.directions.map { it.mode } + options.lines.map { it.mode })
+        .filter { it != Mode.OTHER }.distinct().size > 1
+    fun saveFilters(points: Set<Int>, lines: Set<String>) {
+        FilterHistory.rememberChoices(
+            context, stop.siteId, stop.hiddenStopPoints + points, stop.hiddenLines + lines + addedLines,
+        )
+        onSave(points, lines)
+    }
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(s.directionsTitle(stop.name)) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState())) {
-                if (directions.isEmpty()) {
+                Text(s.filterHistoryHint, style = MaterialTheme.typography.bodySmall)
+                Spacer(Modifier.height(16.dp))
+                if (options.directions.isEmpty()) {
                     Text(s.noDirectionsNow)
                 } else {
-                    if (directions.size == 1) {
-                        Text(s.singleDirection)
-                    } else {
-                        Text(s.showDeparturesGoing, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(8.dp))
-                        for (d in directions) {
-                            val shown = d.stopPointId !in hidden
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable { hidden = if (shown) hidden + d.stopPointId else hidden - d.stopPointId },
-                            ) {
-                                Checkbox(checked = shown, onCheckedChange = null)
-                                Spacer(Modifier.width(8.dp))
-                                Column(Modifier.padding(vertical = 8.dp)) {
-                                    Text(s.towards(d.destinations.take(3).joinToString(", ")))
-                                    val detail = listOfNotNull(
-                                        s.modeName(d.mode).takeIf { mixedModes },
-                                        s.platform(d.platform, d.mode).takeIf { d.platform.isNotBlank() },
-                                    ).joinToString(" · ")
-                                    if (detail.isNotEmpty()) {
-                                        Text(
-                                            detail,
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    if (lines.size > 1) {
-                        Spacer(Modifier.height(16.dp))
-                        Text(s.showLinesGoing, style = MaterialTheme.typography.bodyMedium)
-                        Spacer(Modifier.height(8.dp))
-                        for (l in lines) {
-                            val shown = l.line !in hiddenLines
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        hiddenLines = if (shown) hiddenLines + l.line else hiddenLines - l.line
-                                    },
-                            ) {
-                                Checkbox(checked = shown, onCheckedChange = null)
-                                Spacer(Modifier.width(8.dp))
-                                Column(Modifier.padding(vertical = 8.dp)) {
-                                    Text(l.line, fontWeight = FontWeight.Bold)
-                                    if (mixedModes) {
-                                        Text(
-                                            s.modeName(l.mode),
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        )
-                                    }
+                    Text(s.showDeparturesGoing, style = MaterialTheme.typography.bodyMedium)
+                    Spacer(Modifier.height(8.dp))
+                    for (d in options.directions) {
+                        val shown = d.stopPointId !in hidden
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable {
+                                hidden = if (shown) hidden + d.stopPointId else hidden - d.stopPointId
+                            },
+                        ) {
+                            Checkbox(checked = shown, onCheckedChange = null)
+                            Spacer(Modifier.width(8.dp))
+                            Column(Modifier.padding(vertical = 8.dp)) {
+                                Text(if (d.destinations.isEmpty()) s.unknownStopPoint(d.stopPointId)
+                                    else s.towards(d.destinations.joinToString(", ")))
+                                val detail = listOfNotNull(
+                                    s.modeName(d.mode).takeIf { mixedModes && d.mode != Mode.OTHER },
+                                    s.platform(d.platform, d.mode).takeIf { d.platform.isNotBlank() },
+                                ).joinToString(" · ")
+                                if (detail.isNotEmpty()) {
+                                    Text(detail, style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                                 }
                             }
                         }
                     }
                 }
+                Spacer(Modifier.height(16.dp))
+                Text(s.showLinesGoing, style = MaterialTheme.typography.bodyMedium)
+                Spacer(Modifier.height(8.dp))
+                for (line in options.lines) {
+                    val shown = line.line !in hiddenLines
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().clickable {
+                            hiddenLines = if (shown) hiddenLines + line.line else hiddenLines - line.line
+                        },
+                    ) {
+                        Checkbox(checked = shown, onCheckedChange = null)
+                        Spacer(Modifier.width(8.dp))
+                        Column(Modifier.padding(vertical = 8.dp)) {
+                            Text(line.line, fontWeight = FontWeight.Bold)
+                            if (mixedModes && line.mode != Mode.OTHER) {
+                                Text(s.modeName(line.mode), style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                }
+                OutlinedTextField(
+                    value = lineInput,
+                    onValueChange = { lineInput = it },
+                    label = { Text(s.lineNumber) },
+                    isError = lineInput.isNotBlank() && normalizedLine == null,
+                    supportingText = {
+                        if (lineInput.isNotBlank() && normalizedLine == null) Text(s.invalidLineNumber)
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                TextButton(
+                    onClick = {
+                        if (normalizedLine != null) {
+                            hiddenLines = hiddenLines + normalizedLine
+                            addedLines = addedLines + normalizedLine
+                            lineInput = ""
+                        }
+                    },
+                    enabled = normalizedLine != null,
+                ) { Text(s.hideLine) }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(hidden, hiddenLines) }) { Text(s.save) }
+            TextButton(onClick = { saveFilters(hidden, hiddenLines) }) { Text(s.save) }
         },
         dismissButton = {
             Row {
                 if (hidden.isNotEmpty() || hiddenLines.isNotEmpty()) {
-                    TextButton(onClick = { onSave(emptySet(), emptySet()) }) { Text(s.showAll) }
+                    TextButton(onClick = { saveFilters(emptySet(), emptySet()) }) { Text(s.showAll) }
                 }
                 TextButton(onClick = onDismiss) { Text(s.cancel) }
             }

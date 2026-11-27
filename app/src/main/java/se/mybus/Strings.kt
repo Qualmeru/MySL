@@ -33,9 +33,13 @@ abstract class Strings {
     abstract val chooseDirections: String
     abstract fun directionsTitle(stop: String): String
     abstract val noDirectionsNow: String
-    abstract val singleDirection: String
+    abstract val filterHistoryHint: String
+    abstract fun unknownStopPoint(id: Int): String
     abstract val showDeparturesGoing: String
     abstract val showLinesGoing: String
+    abstract val lineNumber: String
+    abstract val invalidLineNumber: String
+    abstract val hideLine: String
     abstract fun towards(destinations: String): String
     abstract fun platform(p: String, mode: Mode): String
     abstract fun modeName(mode: Mode): String
@@ -139,10 +143,14 @@ object Swedish : Strings() {
     override fun optionsFor(stop: String) = "Alternativ för $stop"
     override val chooseDirections = "Välj riktningar…"
     override fun directionsTitle(stop: String) = "Riktningar – $stop"
-    override val noDirectionsNow = "Inga avgångar just nu att välja riktning från. Försök igen när trafiken går."
-    override val singleDirection = "Allt här avgår från samma läge, så det finns inget att filtrera."
+    override val noDirectionsNow = "Inga kända riktningar ännu."
+    override val filterHistoryHint = "Tidigare sedda riktningar och linjer visas även när de inte går just nu."
+    override fun unknownStopPoint(id: Int) = "Hållplatsläge $id"
     override val showDeparturesGoing = "Visa avgångar:"
     override val showLinesGoing = "Visa linjer:"
+    override val lineNumber = "Linjenummer"
+    override val invalidLineNumber = "Ange en linje med högst 32 bokstäver, siffror eller bindestreck."
+    override val hideLine = "Dölj linje"
     override fun towards(destinations: String) = "mot $destinations"
     override fun platform(p: String, mode: Mode) = if (mode == Mode.BUS) "Läge $p" else "Spår $p"
     override fun modeName(mode: Mode) = when (mode) {
@@ -239,10 +247,14 @@ object English : Strings() {
     override fun optionsFor(stop: String) = "Options for $stop"
     override val chooseDirections = "Choose directions…"
     override fun directionsTitle(stop: String) = "Directions – $stop"
-    override val noDirectionsNow = "No departures right now to pick a direction from. Try again when traffic is running."
-    override val singleDirection = "Everything here leaves from the same spot, so there's nothing to filter."
+    override val noDirectionsNow = "No known directions yet."
+    override val filterHistoryHint = "Previously seen directions and lines are shown even when they aren't running now."
+    override fun unknownStopPoint(id: Int) = "Stop point $id"
     override val showDeparturesGoing = "Show departures:"
     override val showLinesGoing = "Show lines:"
+    override val lineNumber = "Line number"
+    override val invalidLineNumber = "Enter one line, up to 32 letters, digits or hyphens."
+    override val hideLine = "Hide line"
     override fun towards(destinations: String) = "towards $destinations"
     override fun platform(p: String, mode: Mode) = if (mode == Mode.BUS) "Stand $p" else "Track $p"
     override fun modeName(mode: Mode) = when (mode) {

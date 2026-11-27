@@ -62,6 +62,15 @@ class FiltersTest {
     }
 
     @Test
+    fun `normalizes a manually entered line and rejects invalid input`() {
+        assertEquals("553H", normalizeLineInput(" 553h "))
+        assertEquals("C1", normalizeLineInput("c1"))
+        assertEquals(null, normalizeLineInput("178 179"))
+        assertEquals(null, normalizeLineInput(""))
+        assertEquals(null, normalizeLineInput("1".repeat(33)))
+    }
+
+    @Test
     fun `lists lines by mode then number, suffixes next to their number`() {
         val deps = listOf("553V", "178", "41", "553H", "4", "553", "C1", "178").map { departure(line = it) } +
             departure(line = "43", mode = Mode.TRAIN)

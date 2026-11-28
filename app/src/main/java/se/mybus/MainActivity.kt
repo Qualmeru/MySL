@@ -39,6 +39,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.font.FontWeight
@@ -268,11 +269,18 @@ fun DeparturesScreen(
             TopAppBar(
                 title = {
                     Column {
-                        Text(s.title)
-                        Text(
-                            updatedAt?.let { s.updated(it) } ?: s.fetching,
-                            style = MaterialTheme.typography.bodySmall,
-                        )
+                        Text(s.title, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // The bar is a fixed height: at the largest font sizes two lines don't fit
+                        // and the second would be cut in half, so it's left out. The spinner on the
+                        // refresh button still shows when it's loading.
+                        if (LocalDensity.current.fontScale < 1.5f) {
+                            Text(
+                                updatedAt?.let { s.updated(it) } ?: s.fetching,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
                     }
                 },
                 actions = {
@@ -846,7 +854,7 @@ private fun DepartureRow(d: Departure, now: LocalDateTime) {
                 .background(lineColor(d), RoundedCornerShape(6.dp))
                 .padding(horizontal = 8.dp, vertical = 4.dp),
         ) {
-            Text(d.line, color = Color.White, fontWeight = FontWeight.Bold)
+            Text(d.line, color = Color.White, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
@@ -875,9 +883,15 @@ private fun DepartureRow(d: Departure, now: LocalDateTime) {
         }
         Spacer(Modifier.width(12.dp))
         Column(horizontalAlignment = Alignment.End) {
-            Text(left, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
+            Text(left, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, maxLines = 1, softWrap = false)
             if (d.expected != left) {
-                Text(d.expected, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(
+                    d.expected,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    softWrap = false,
+                )
             }
         }
     }

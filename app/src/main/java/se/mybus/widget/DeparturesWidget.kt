@@ -5,8 +5,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlin.math.roundToInt
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.LocalContext
@@ -97,6 +99,10 @@ internal class WidgetStyles(private val mode: ThemeMode) {
     val notice = TextStyle(fontSize = 13.sp, color = error)
 }
 
+// Glance sizes are fixed dp while text grows with the phone's font size, so boxes that hold text
+// grow with it too. Capped at double, Android's largest font setting.
+internal fun scaledDp(base: Int, fontScale: Float): Dp = (base * fontScale.coerceIn(1f, 2f)).roundToInt().dp
+
 // Provided by WidgetContent, so the rows don't each need it passed in.
 private val LocalWidgetStyles = staticCompositionLocalOf { WidgetStyles(ThemeMode.SYSTEM) }
 
@@ -184,6 +190,7 @@ private fun WidgetBody(
     refreshing: Boolean,
 ) {
     val styles = LocalWidgetStyles.current
+    val fontScale = LocalContext.current.resources.configuration.fontScale
     Column(modifier = GlanceModifier.fillMaxSize().background(styles.background).clickable(tapAction())) {
         Row(
             modifier = GlanceModifier.fillMaxWidth().padding(start = 14.dp, end = 8.dp, top = 12.dp, bottom = 8.dp),
@@ -192,16 +199,16 @@ private fun WidgetBody(
             Column(modifier = GlanceModifier.defaultWeight().clickable(tapAction())) {
                 Text(title, style = styles.title, maxLines = 1)
                 if (refreshing) {
-                    Text(s.refreshing, style = styles.updated)
+                    Text(s.refreshing, style = styles.updated, maxLines = 1)
                 } else if (lastFetch != null) {
                     val time = Instant.ofEpochMilli(lastFetch).atZone(ZoneId.systemDefault()).format(HourMinute)
-                    Text(s.updated(time), style = styles.updated)
+                    Text(s.updated(time), style = styles.updated, maxLines = 1)
                 }
             }
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = GlanceModifier
-                    .size(48.dp)
+                    .size(scaledDp(48, fontScale))
                     .clickable(actionRunCallback<RefreshAction>())
                     .semantics { contentDescription = s.refresh },
             ) {
@@ -224,6 +231,7 @@ private fun WidgetBody(
                         Text(
                             stop.name,
                             style = LocalWidgetStyles.current.stop,
+                            maxLines = 2,
                             modifier = GlanceModifier
                                 .fillMaxWidth()
                                 .clickable(tapAction())
@@ -265,6 +273,7 @@ private fun Message(text: String) {
 @Composable
 private fun DepartureRowGlance(s: Strings, d: Departure, now: LocalDateTime) {
     val styles = LocalWidgetStyles.current
+    val fontScale = LocalContext.current.resources.configuration.fontScale
     val left = timeLeft(d, now, s)
     Row(
         verticalAlignment = Alignment.Vertical.CenterVertically,
@@ -275,15 +284,16 @@ private fun DepartureRowGlance(s: Strings, d: Departure, now: LocalDateTime) {
             .semantics { contentDescription = s.describe(d, left) }
             .padding(horizontal = 14.dp, vertical = 5.dp),
     ) {
-        // Fixed width so "41" and "178" line up (Glance has no min-width); fits up to "553H".
+        // One width for every badge so "41" and "178" line up (Glance has no min-width). It fits
+        // up to "553H", growing with the font size so that still fits at the largest setting.
         Box(
             contentAlignment = Alignment.Center,
             modifier = GlanceModifier
-                .width(58.dp)
+                .width(scaledDp(58, fontScale))
                 .background(ColorProvider(day = lineColor(d), night = lineColor(d)))
                 .padding(vertical = 3.dp),
         ) {
-            Text(d.line, style = styles.badge)
+            Text(d.line, style = styles.badge, maxLines = 1)
         }
         Spacer(modifier = GlanceModifier.width(10.dp))
         // Same as the app: a cancelled departure is crossed out and says so, and SL's disruption
@@ -307,8 +317,9 @@ private fun DepartureRowGlance(s: Strings, d: Departure, now: LocalDateTime) {
             Text(
                 left,
                 style = if (d.cancelled) styles.time.copy(color = styles.error, textDecoration = strike) else styles.time,
+                maxLines = 1,
             )
-            if (d.expected != left) Text(d.expected, style = styles.updated)
+            if (d.expected != left) Text(d.expected, style = styles.updated, maxLines = 1)
         }
     }
 }
